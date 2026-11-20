@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>IMBALANCE — 3D Fair Value Gap Arcade</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Top Institutional HUD -->
+    <header id="hud-top" class="hud-panel">
+      <div class="brand-cluster">
+        <span class="brand-dot"></span>
+        <div>
+          <h1 class="brand-title">IMBALANCE</h1>
+          <span id="session-badge" class="session-badge">LVL 1 · 4H SWING</span>
+        </div>
+      </div>
+
+      <div class="metrics-cluster">
+        <div class="metric-box">
+          <span class="metric-label">P&amp;L SCORE</span>
+          <span id="score-value" class="metric-value">0</span>
+        </div>
+        <div class="metric-box">
+          <span class="metric-label">STREAK</span>
+          <span id="streak-value" class="metric-value streak-hot">0x</span>
+        </div>
+        <div class="metric-box">
+          <span class="metric-label">EQUITY</span>
+          <span id="lives-value" class="metric-value lives-ok">■■■</span>
+        </div>
+        <button id="mute-btn" class="icon-btn" title="Toggle Synth Audio" aria-label="Toggle Sound">🔊</button>
+      </div>
+    </header>
+
+    <!-- Level Progress Bar -->
+    <div id="level-progress-wrap">
+      <div id="level-progress-bar"></div>
+    </div>
+
+    <!-- Dynamic Floating Callout Toast -->
+    <div id="callout-banner" class="callout hidden">
+      <div id="callout-title" class="callout-title">SNIPER CE FILL!</div>
+      <div id="callout-sub" class="callout-sub">50% Consequent Encroachment · 3.0x R:R</div>
+    </div>
+
+    <!-- Bottom Controls & Quick-Snipe Bar -->
+    <footer id="hud-bottom">
+      <p id="hint-text" class="hint-text">
+        Tap/Click inside a glowing <strong>FVG Zone</strong> (aim for the dashed <strong>50% CE line</strong>) before price retraces!
+      </p>
+      <button id="quick-snipe-btn" class="snipe-btn" disabled>
+        🎯 LOCK 50% CE ENTRY
+      </button>
+    </footer>
+
+    <!-- Start / Re-Enter Modal Overlay -->
+    <div id="overlay-screen" class="overlay">
+      <div class="overlay-card">
+        <div class="overlay-kicker">PRICE-ACTION ARCADE · SMC ENGINE</div>
+        <h2 id="overlay-title" class="overlay-title">IMBALANCE</h2>
+        <p id="overlay-desc" class="overlay-desc">
+          Spot 3-candle <strong>Fair Value Gaps</strong> as displacement rips open. Lock your limit order near the
+          <strong>50% Consequent Encroachment</strong> line and ride the institutional bounce before a stop-hunt flips the gap!
+        </p>
+
+        <div class="legend-grid">
+          <div class="legend-item">
+            <span class="swatch bull"></span>
+            <span>Bullish FVG (Tap to Buy)</span>
+          </div>
+          <div class="legend-item">
+            <span class="swatch bear"></span>
+            <span>Bearish FVG (Tap to Sell)</span>
+          </div>
+          <div class="legend-item">
+            <span class="swatch ce"></span>
+            <span>50% CE Line = 3.0x Sniper</span>
+          </div>
+          <div class="legend-item">
+            <span class="swatch ifvg"></span>
+            <span>Invalidated = IFVG Flip</span>
+          </div>
+        </div>
+
+        <button id="start-btn" class="primary-btn">ENTER MARKET SESSION</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
