@@ -1,21 +1,23 @@
 import { SynthAudioEngine } from './engine/audioEngine';
 import {
   detectFairValueGap,
-  evaluateCandleAgainstGaps,
-  evaluateEntryPrecision,
   LEVEL_CONFIGS,
   STARTING_DOLLARS,
 } from './engine/fvgEngine';
 import { PriceActionGenerator } from './engine/priceGenerator';
-import { ChartScene } from './scene/chartScene';
+import {
+  CANDLE_SPACING_X,
+  ChartScene,
+  priceToWorldY,
+} from './scene/chartScene';
 import { LeaderboardService } from './services/leaderboardService';
-import { FairValueGap, LevelConfig } from './types/market';
+import { FairValueGap, LevelConfig, WorldObject } from './types/market';
 import { HudController } from './ui/hudController';
 
-const DEMO_SEEN_KEY = 'imbalance_gow2_demo_seen_v1';
-const PLAYER_NAME_KEY = 'imbalance_gow2_player_name_v1';
+const DEMO_SEEN_KEY = 'imbalance_gow2_demo_seen_v3';
+const PLAYER_NAME_KEY = 'imbalance_gow2_player_name_v3';
 
-class ImbalanceGodOfWarGame {
+class ImbalanceSpartanRunner {
   private generator = new PriceActionGenerator();
   private audio = new SynthAudioEngine();
   private hud = new HudController();
@@ -23,26 +25,38 @@ class ImbalanceGodOfWarGame {
   private chart: ChartScene;
 
   private activeGaps: FairValueGap[] = [];
+  private worldObjects: WorldObject[] = [];
+  private highestSpawnedCandleIdx = 0;
+
   private isRunning = false;
   private isDemoMode = false;
   private demoRemainingSec = 60;
   private hasSeenDemoBefore = false;
 
+  // Spartan Physics & Combat State
+  private runnerX = 4 * CANDLE_SPACING_X;
+  private runnerY = 0;
+  private velocityY = 0;
+  private isGrounded = true;
+  private jumpsRemaining = 2;
+  private slashActiveTimer = 0;
+
+  // Economy & Progression
   private playerName = 'KRATOS';
   private dollars = STARTING_DOLLARS;
   private peakDollars = STARTING_DOLLARS;
   private streak = 0;
   private maxStreak = 0;
   private shields = 3;
+  private rageMeter = 0;
+  private rageActiveTimer = 0;
   private levelIndex = 0;
-  private tickAccumulatorMs = 0;
+  private elapsedTime = 0;
   private lastFrameTime = performance.now();
 
   constructor() {
     const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
-    this.chart = new ChartScene(canvas, (gap, clickedPrice) => {
-      this.placeOrderOnGap(gap, clickedPrice);
-    });
+    this.chart = new ChartScene(canvas);
 
     this.hasSeenDemoBefore = localStorage.getItem(DEMO_SEEN_KEY) === 'true';
     const savedName = localStorage.getItem(PLAYER_NAME_KEY);
@@ -54,8 +68,8 @@ class ImbalanceGodOfWarGame {
       if (input) input.value = savedName;
     }
 
-    this.bindControls();
-    this.bootstrapPreviewScene();
+    this.bindControls(canvas);
+    this.bootstrapPreview();
     this.refreshLeaderboardUI();
     requestAnimationFrame(this.loop);
   }
@@ -92,53 +106,72 @@ class ImbalanceGodOfWarGame {
     );
   }
 
-  private bindControls(): void {
-    const playBtn = document.getElementById('play-btn')!;
-    playBtn.addEventListener('click', () => {
+  private bindControls(canvas: HTMLCanvasElement): void {
+    document.getElementById('play-btn')!.addEventListener('click', () => {
       this.readPlayerName();
-      // First-time players automatically experience the 1-minute manual demo first;
-      // returning players jump straight into live trading.
-      if (!this.hasSeenDemoBefore) {
-        this.startSession(true);
-      } else {
-        this.startSession(false);
-      }
+      this.startSession(!this.hasSeenDemoBefore);
     });
 
-    const watchDemoBtn = document.getElementById('watch-demo-btn')!;
-    watchDemoBtn.addEventListener('click', () => {
+    document.getElementById('watch-demo-btn')!.addEventListener('click', () => {
       this.readPlayerName();
       this.startSession(true);
     });
 
-    const skipDemoBtn = document.getElementById('skip-demo-btn')!;
-    skipDemoBtn.addEventListener('click', () => {
+    document.getElementById('skip-demo-btn')!.addEventListener('click', () => {
       if (this.isDemoMode) {
         this.finishDemoAndEnterLive();
       }
     });
 
-    const muteBtn = document.getElementById('mute-btn')!;
-    muteBtn.addEventListener('click', () => {
+    document.getElementById('mute-btn')!.addEventListener('click', () => {
       this.audio.muted = !this.audio.muted;
-      muteBtn.textContent = this.audio.muted ? '🔇' : '🔊';
+      document.getElementById('mute-btn')!.textContent = this.audio.muted
+        ? '🔇'
+        : '🔊';
     });
 
-    const quickSnipeBtn = document.getElementById('quick-snipe-btn')!;
-    quickSnipeBtn.addEventListener('click', () => {
+    document.getElementById('jump-btn')!.addEventListener('click', () => {
+      this.performJump();
+    });
+
+    document.getElementById('slash-btn')!.addEventListener('click', () => {
+      this.performBladeSlash();
+    });
+
+    // Keyboard controls
+    window.addEventListener('keydown', (e) => {
       if (!this.isRunning) return;
-      const openGap = [...this.activeGaps]
-        .reverse()
-        .find((g) => g.status === 'OPEN');
-      if (openGap) {
-        this.placeOrderOnGap(openGap, openGap.ceMidpoint);
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+        e.preventDefault();
+        this.performJump();
+      } else if (e.code === 'Space' || e.code === 'KeyE' || e.code === 'Enter') {
+        e.preventDefault();
+        this.performBladeSlash();
+      }
+    });
+
+    // Touch swipe up to jump, tap canvas to Blade Slash
+    let touchStartY = 0;
+    canvas.addEventListener('pointerdown', (e) => {
+      if (!this.isRunning) return;
+      touchStartY = e.clientY;
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+      if (!this.isRunning) return;
+      const dy = touchStartY - e.clientY;
+      if (dy > 32) {
+        this.performJump();
+      } else {
+        this.performBladeSlash();
       }
     });
   }
 
-  private bootstrapPreviewScene(): void {
+  private bootstrapPreview(): void {
     this.chart.applyLevelTheme(this.getCurrentLevel());
     this.chart.syncCandles(this.generator.getCandles());
+    this.chart.spartan.root.position.set(this.runnerX, 0.5, 0);
   }
 
   private startSession(demoMode: boolean): void {
@@ -150,35 +183,39 @@ class ImbalanceGodOfWarGame {
     this.streak = 0;
     this.maxStreak = 0;
     this.shields = 3;
+    this.rageMeter = 0;
+    this.rageActiveTimer = 0;
     this.levelIndex = 0;
-    this.activeGaps = [];
-    this.tickAccumulatorMs = 0;
 
+    this.activeGaps = [];
+    this.worldObjects = [];
     this.generator.reset();
     this.chart.clearAll();
     this.chart.applyLevelTheme(this.getCurrentLevel());
-    this.chart.syncCandles(this.generator.getCandles());
 
+    const initialCandles = this.generator.getCandles();
+    this.highestSpawnedCandleIdx =
+      initialCandles[initialCandles.length - 1].index;
+    this.runnerX = 5 * CANDLE_SPACING_X;
+    this.runnerY = 2.0;
+    this.velocityY = 0;
+    this.isGrounded = false;
+    this.jumpsRemaining = 2;
+
+    this.chart.syncCandles(initialCandles);
     this.audio.playWarDrum();
     this.hud.hideOverlay();
     this.hud.setDemoModeUI(demoMode, this.hasSeenDemoBefore, 60);
-    this.hud.updateStats(
-      this.dollars,
-      this.streak,
-      this.shields,
-      this.getCurrentLevel(),
-      STARTING_DOLLARS
-    );
 
     if (demoMode) {
       this.hud.updateDemoPrompt(
-        'STEP 1 OF 3 · WATCH FOR DISPLACEMENT',
-        '3 rapid candles create a glowing Fair Value Gap (FVG) bridge. Watch the chart print!'
+        'STEP 1 · JUMP FOR GOLD ORBS & OVER SPIKES!',
+        'Tap JUMP (or swipe up / W) to leap over red Hades Traps and grab floating Dollar Orbs!'
       );
     } else {
       this.hud.showCallout(
         'REALM I · COLOSSUS OF RHODES',
-        'Strike inside glowing FVG bridges to earn Dollars!'
+        'Jump traps, grab Gold Orbs & Slash inside FVG Bridges!'
       );
     }
 
@@ -191,119 +228,343 @@ class ImbalanceGodOfWarGame {
     this.startSession(false);
   }
 
-  private placeOrderOnGap(gap: FairValueGap, rawPrice: number): void {
+  private performJump(): void {
+    if (!this.isRunning || this.jumpsRemaining <= 0) return;
+    this.velocityY = this.jumpsRemaining === 2 ? 12.8 : 11.2;
+    this.isGrounded = false;
+    this.jumpsRemaining -= 1;
+    this.audio.playJump();
+  }
+
+  private performBladeSlash(): void {
     if (!this.isRunning) return;
-    if (gap.status !== 'OPEN' && gap.status !== 'ORDER_PLACED') return;
+    this.slashActiveTimer = 0.36;
+    this.chart.spartan.triggerSlash();
+    this.audio.playBladeSlash();
 
-    const precision = evaluateEntryPrecision(gap, rawPrice);
-    gap.status = 'ORDER_PLACED';
-    gap.orderEntryPrice = precision.clampedPrice;
-    gap.stopLossPrice = precision.stopLossPrice;
-    gap.fillQuality = precision.fillQuality;
-    gap.rrMultiplier = precision.rrMultiplier;
+    const spartanPos = this.chart.spartan.root.position.clone();
+    spartanPos.y += 1.1;
+    this.chart.animations.spawnShockwave(spartanPos, 0xff7b00);
 
-    const isSniper = precision.fillQuality === 'SNIPER_CE';
-    this.audio.playBladeStrike(isSniper);
+    const rageMult = this.rageActiveTimer > 0 ? 2 : 1;
 
-    if (this.isDemoMode) {
-      this.hud.updateDemoPrompt(
-        'STEP 3 OF 3 · ORDER LOCKED! WATCH THE BOUNCE',
-        'Price will now retrace into your FVG zone and bounce—unleashing Olympus Dollar Orbs!'
-      );
-    }
+    // 1. Check if Spartan is inside or adjacent to a glowing Fair Value Gap Bridge!
+    for (const gap of this.activeGaps) {
+      if (gap.status !== 'OPEN') continue;
+      const startX = gap.createdAtIndex * CANDLE_SPACING_X - 1.2;
+      const endX = startX + 6.4;
 
-    this.hud.showCallout(
-      isSniper ? '⚔️ 50% CE SNIPER STRIKE ARMED' : 'LIMIT ORDER ARMED',
-      `Target ${precision.rrMultiplier.toFixed(1)}x R:R · Awaiting retracement`
-    );
-    this.refreshQuickSnipeState();
-  }
+      if (this.runnerX >= startX && this.runnerX <= endX) {
+        gap.status = 'EXECUTED';
+        this.streak += 1;
+        this.maxStreak = Math.max(this.maxStreak, this.streak);
+        this.rageMeter = Math.min(100, this.rageMeter + 34);
 
-  private refreshQuickSnipeState(): void {
-    const hasOpenGap = this.activeGaps.some((g) => g.status === 'OPEN');
-    this.hud.setQuickSnipeAvailable(this.isRunning && hasOpenGap);
-  }
+        const ceY = priceToWorldY(gap.ceMidpoint);
+        const nearCE = Math.abs(this.runnerY + 1.0 - ceY) < 1.65;
+        const basePay = nearCE ? 1500 : 850;
+        const obBonus = gap.hasOrderBlockConfluence ? 1.5 : 1.0;
+        const payout = Math.round(
+          basePay * obBonus * (1 + (this.streak - 1) * 0.2) * rageMult
+        );
 
-  private stepMarketTick(): void {
-    const level = this.getCurrentLevel();
-    const newCandle = this.generator.nextCandle(level, this.isDemoMode);
-    const candles = this.generator.getCandles();
-
-    if (newCandle.isLiquiditySweep && !this.isDemoMode) {
-      this.hud.showCallout(
-        '⚡ LIQUIDITY SWEPT',
-        'Stops hunted — prepare for displacement!'
-      );
-    }
-
-    // 1. Evaluate open FVGs against the newly closed candle
-    const { outcomes, nextStreak } = evaluateCandleAgainstGaps(
-      newCandle,
-      this.activeGaps,
-      this.streak
-    );
-    this.streak = nextStreak;
-    this.maxStreak = Math.max(this.maxStreak, this.streak);
-
-    for (const outcome of outcomes) {
-      const gap = this.activeGaps.find((g) => g.id === outcome.fvgId);
-      const isSniper = outcome.fillQuality === 'SNIPER_CE';
-
-      if (gap) {
-        this.chart.triggerGapFeedback(gap, outcome.won, isSniper);
-      }
-
-      const screenPos = this.chart.worldToScreen(outcome.worldX, outcome.worldY);
-      this.hud.spawnDollarPopup(screenPos.x, screenPos.y, outcome.dollarDelta);
-
-      if (outcome.won) {
-        this.dollars += outcome.dollarDelta;
+        this.dollars += payout;
         this.peakDollars = Math.max(this.peakDollars, this.dollars);
-        if (isSniper) {
-          this.chart.animations.triggerHitstop(0.25);
-        }
-        this.audio.playMitigationWin(this.streak, isSniper);
+
+        this.chart.animations.triggerHitstop(0.18);
+        this.chart.animations.spawnShockwave(spartanPos, 0xffd166);
+        this.chart.animations.spawnOlympusOrbs(spartanPos, 28, false);
+        this.audio.playFvgExecution(this.streak);
+
+        const scr = this.chart.worldToScreen(this.runnerX, this.runnerY + 2.2);
+        this.hud.spawnDollarPopup(scr.x, scr.y, payout);
+        this.hud.showCallout(
+          nearCE
+            ? `⚔️ 50% CE BLADE EXECUTION! +$${payout.toLocaleString()}`
+            : `FVG BRIDGE SLASHED! +$${payout.toLocaleString()}`,
+          `${this.streak}x Combo · Rage +34%`
+        );
 
         if (this.isDemoMode) {
           this.hud.updateDemoPrompt(
-            '🏆 VICTORY! YOU COLLECTED DOLLAR ORBS!',
-            'Keep tapping glowing FVG zones until the timer ends—or click Skip Demo below anytime!'
-          );
-        }
-      } else {
-        this.dollars = Math.max(0, this.dollars + outcome.dollarDelta);
-        this.shields -= 1;
-        this.audio.playStopOutFlip();
-      }
-
-      this.hud.showOutcome(outcome);
-    }
-
-    // 2. Detect new 3-candle Fair Value Gap
-    if (candles.length >= 3) {
-      const c1 = candles[candles.length - 3];
-      const c2 = candles[candles.length - 2];
-      const c3 = candles[candles.length - 1];
-      const detected = detectFairValueGap(c1, c2, c3);
-      if (detected) {
-        this.activeGaps.push(detected);
-        this.generator.notifyCreatedGap(detected);
-        this.audio.playFvgSpawn(detected.direction === 'BULLISH');
-
-        if (this.isDemoMode) {
-          this.hud.updateDemoPrompt(
-            'STEP 2 OF 3 · TAP THE GLOWING FVG BRIDGE NOW!',
-            'Tap the gold 50% line inside the FVG (or press STRIKE 50% CE at bottom-right)!'
+            '🏆 PERFECT FVG EXECUTION!',
+            'You slashed inside the glowing Fair Value Gap! Keep playing or tap SKIP DEMO below anytime!'
           );
         }
       }
     }
 
-    if (this.activeGaps.length > 16) {
-      this.activeGaps.shift();
+    // 2. Smash nearby Treasure Chests & Hades Spike Traps with Blades of Chaos!
+    for (const obj of this.worldObjects) {
+      if (obj.collectedOrBroken) continue;
+      const dist = Math.hypot(
+        obj.worldX - this.runnerX,
+        obj.worldY - (this.runnerY + 1.1)
+      );
+
+      if (dist <= 3.1) {
+        if (obj.kind === 'ORDER_BLOCK_CHEST') {
+          obj.collectedOrBroken = true;
+          const payout = obj.valueDollars * rageMult;
+          this.dollars += payout;
+          this.peakDollars = Math.max(this.peakDollars, this.dollars);
+          this.rageMeter = Math.min(100, this.rageMeter + 25);
+
+          this.chart.animations.spawnObjectShatter(
+            spartanPos,
+            0xffd166,
+            16
+          );
+          this.chart.animations.spawnOlympusOrbs(spartanPos, 24, false);
+          this.audio.playFvgExecution(this.streak + 1);
+
+          const scr = this.chart.worldToScreen(obj.worldX, obj.worldY + 1);
+          this.hud.spawnDollarPopup(scr.x, scr.y, payout);
+          this.hud.showCallout(
+            `📦 ORDER BLOCK CHEST SMASHED! +$${payout.toLocaleString()}`,
+            'Institutional Relic Claimed!'
+          );
+        } else if (obj.kind === 'HADES_SPIKE_TRAP') {
+          obj.collectedOrBroken = true;
+          const bonus = 400 * rageMult;
+          this.dollars += bonus;
+          this.peakDollars = Math.max(this.peakDollars, this.dollars);
+          this.rageMeter = Math.min(100, this.rageMeter + 18);
+
+          this.chart.animations.spawnObjectShatter(
+            spartanPos,
+            0xf43f5e,
+            18
+          );
+          this.audio.playOrbPickup(this.streak + 2);
+
+          const scr = this.chart.worldToScreen(obj.worldX, obj.worldY + 1);
+          this.hud.spawnDollarPopup(scr.x, scr.y, bonus);
+          this.hud.showCallout(
+            `💥 HADES TRAP SHATTERED! +$${bonus}`,
+            'Parried with Blades of Chaos!'
+          );
+        }
+      }
+    }
+  }
+
+  private spawnWorldContentAhead(): void {
+    const level = this.getCurrentLevel();
+    const targetCandleIdx = Math.floor(this.runnerX / CANDLE_SPACING_X) + 22;
+
+    while (this.highestSpawnedCandleIdx < targetCandleIdx) {
+      const candle = this.generator.nextCandle(level);
+      this.highestSpawnedCandleIdx = candle.index;
+      const candles = this.generator.getCandles();
+
+      const worldX = candle.index * CANDLE_SPACING_X;
+      const topY = priceToWorldY(Math.max(candle.open, candle.close));
+
+      // Check 3-candle FVG creation
+      let spawnedFvg = false;
+      if (candles.length >= 3) {
+        const c1 = candles[candles.length - 3];
+        const c2 = candles[candles.length - 2];
+        const c3 = candles[candles.length - 1];
+        const fvg = detectFairValueGap(c1, c2, c3);
+        if (fvg) {
+          this.activeGaps.push(fvg);
+          spawnedFvg = true;
+
+          // Place an Order Block Treasure Chest inside the FVG bridge!
+          this.worldObjects.push({
+            id: `chest-${candle.index}`,
+            kind: 'ORDER_BLOCK_CHEST',
+            worldX: worldX + 1.8,
+            worldY: priceToWorldY(fvg.ceMidpoint),
+            valueDollars: 2000,
+            collectedOrBroken: false,
+          });
+
+          if (this.isDemoMode) {
+            this.hud.updateDemoPrompt(
+              'STEP 2 · GLOWING FVG BRIDGE & CHEST AHEAD!',
+              'Tap BLADE SLASH (or tap screen / SPACE) as your Spartan runs through the glowing bridge!'
+            );
+          }
+        }
+      }
+
+      // Spawn interactive 3D Gold Dollar Orbs & Hades Traps along the track
+      if (!spawnedFvg && candle.index > 14) {
+        if (candle.index % 3 === 0) {
+          // Arc of 3 Gold Dollar Orbs to jump for
+          for (let k = 0; k < 3; k++) {
+            this.worldObjects.push({
+              id: `orb-${candle.index}-${k}`,
+              kind: 'DOLLAR_ORB',
+              worldX: worldX + k * 0.85,
+              worldY: topY + 1.2 + Math.sin((k / 2) * Math.PI) * 1.4,
+              valueDollars: 250,
+              collectedOrBroken: false,
+            });
+          }
+        } else if (
+          !this.isDemoMode &&
+          candle.index % 7 === 0
+        ) {
+          // Spinning Hades Spike Trap on the candle surface
+          this.worldObjects.push({
+            id: `trap-${candle.index}`,
+            kind: 'HADES_SPIKE_TRAP',
+            worldX,
+            worldY: topY + 0.75,
+            valueDollars: 0,
+            collectedOrBroken: false,
+          });
+        }
+      }
     }
 
-    // 3. Realm / Theme Ascension Check
+    // Prune far-behind gaps & objects
+    const cutoffX = this.runnerX - 18;
+    this.activeGaps = this.activeGaps.filter(
+      (g) => g.createdAtIndex * CANDLE_SPACING_X > cutoffX
+    );
+    this.worldObjects = this.worldObjects.filter(
+      (o) => !o.collectedOrBroken && o.worldX > cutoffX
+    );
+  }
+
+  private getGroundHeightAt(worldX: number): number {
+    const candles = this.generator.getCandles();
+    const approxIdx = Math.round(worldX / CANDLE_SPACING_X);
+    const candle = candles.find((c) => c.index === approxIdx);
+    if (!candle) return -3.0;
+    return priceToWorldY(Math.max(candle.open, candle.close));
+  }
+
+  private updateSimulation(dt: number): void {
+    const level = this.getCurrentLevel();
+
+    // Activate Spartan Rage Mode automatically when meter hits 100%
+    if (this.rageMeter >= 100 && this.rageActiveTimer <= 0) {
+      this.rageActiveTimer = 7.5;
+      this.rageMeter = 0;
+      this.audio.playRealmAscension();
+      this.hud.showCallout(
+        '🔥 SPARTAN RAGE UNLEASHED!',
+        '2X DOLLAR PAYOUTS · INVINCIBLE · ORB MAGNET!'
+      );
+    }
+
+    if (this.rageActiveTimer > 0) {
+      this.rageActiveTimer = Math.max(0, this.rageActiveTimer - dt);
+    }
+    if (this.slashActiveTimer > 0) {
+      this.slashActiveTimer = Math.max(0, this.slashActiveTimer - dt);
+    }
+
+    // 1. Forward Spartan Sprint
+    const speed = this.isDemoMode ? level.runSpeed * 0.85 : level.runSpeed;
+    this.runnerX += speed * dt;
+
+    // 2. Gravity & Candle Platform Grounding
+    this.velocityY -= 29.0 * dt;
+    this.runnerY += this.velocityY * dt;
+
+    const groundY = this.getGroundHeightAt(this.runnerX);
+    if (this.runnerY <= groundY && this.velocityY <= 0) {
+      this.runnerY = groundY;
+      this.velocityY = 0;
+      this.isGrounded = true;
+      this.jumpsRemaining = 2;
+    } else {
+      this.isGrounded = false;
+    }
+
+    // Safety floor so Spartan never falls infinitely off-screen
+    if (this.runnerY < -8.5) {
+      this.runnerY = groundY + 1.5;
+      this.velocityY = 0;
+      this.jumpsRemaining = 2;
+    }
+
+    this.chart.spartan.root.position.set(this.runnerX, this.runnerY, 0);
+    this.chart.spartan.update(
+      dt,
+      this.isGrounded,
+      this.rageActiveTimer > 0
+    );
+
+    // 3. Object Collisions (Gold Orbs, Chests, Hades Traps)
+    const isRage = this.rageActiveTimer > 0;
+    const rageMult = isRage ? 2 : 1;
+    const magnetRange = isRage ? 6.5 : 1.75;
+
+    for (const obj of this.worldObjects) {
+      if (obj.collectedOrBroken) continue;
+
+      const dx = obj.worldX - this.runnerX;
+      const dy = obj.worldY - (this.runnerY + 1.0);
+      const dist = Math.hypot(dx, dy);
+
+      if (obj.kind === 'DOLLAR_ORB') {
+        // Pull orb gently when close or in Spartan Rage
+        if (dist < magnetRange && dist > 0.2) {
+          obj.worldX -= (dx / dist) * 14 * dt;
+          obj.worldY -= (dy / dist) * 14 * dt;
+        }
+        if (dist < 1.35) {
+          obj.collectedOrBroken = true;
+          const gain = obj.valueDollars * rageMult;
+          this.dollars += gain;
+          this.peakDollars = Math.max(this.peakDollars, this.dollars);
+          this.rageMeter = Math.min(100, this.rageMeter + 6);
+          this.audio.playOrbPickup(this.streak);
+
+          const scr = this.chart.worldToScreen(obj.worldX, obj.worldY + 0.8);
+          this.hud.spawnDollarPopup(scr.x, scr.y, gain);
+        }
+      } else if (obj.kind === 'ORDER_BLOCK_CHEST') {
+        if (dist < 1.5 && (this.slashActiveTimer > 0 || isRage)) {
+          this.performBladeSlash();
+        }
+      } else if (obj.kind === 'HADES_SPIKE_TRAP') {
+        if (dist < 1.15) {
+          obj.collectedOrBroken = true;
+          if (this.slashActiveTimer > 0 || isRage) {
+            // Smashed through trap cleanly!
+            const bonus = 400 * rageMult;
+            this.dollars += bonus;
+            this.chart.animations.spawnObjectShatter(
+              new THREE.Vector3(obj.worldX, obj.worldY, 0),
+              0xf43f5e,
+              16
+            );
+            this.audio.playOrbPickup(this.streak + 1);
+          } else {
+            // Hit trap without jumping or slashing
+            this.shields -= 1;
+            this.streak = 0;
+            this.dollars = Math.max(0, this.dollars - 750);
+            this.chart.animations.triggerCameraShake(0.95);
+            this.chart.animations.spawnOlympusOrbs(
+              new THREE.Vector3(obj.worldX, obj.worldY, 0),
+              18,
+              true
+            );
+            this.audio.playDamageHit();
+
+            const scr = this.chart.worldToScreen(obj.worldX, obj.worldY + 1);
+            this.hud.spawnDollarPopup(scr.x, scr.y, -750);
+            this.hud.showCallout(
+              '💀 HADES TRAP HIT! -$750',
+              'Jump over or Blade-Slash traps!',
+              true
+            );
+          }
+        }
+      }
+    }
+
+    // 4. Realm Theme Ascension
     if (
       !this.isDemoMode &&
       this.levelIndex < LEVEL_CONFIGS.length - 1 &&
@@ -319,19 +580,24 @@ class ImbalanceGodOfWarGame {
       );
     }
 
-    // 4. Sync 3D visuals & HUD
-    this.chart.syncCandles(candles);
+    // 5. Spawn ahead & Sync 3D Scene + HUD
+    this.spawnWorldContentAhead();
+    this.chart.syncCandles(this.generator.getCandles());
     this.chart.syncFairValueGaps(this.activeGaps);
+    this.chart.syncWorldObjects(this.worldObjects, this.elapsedTime);
+
     this.hud.updateStats(
       this.dollars,
       this.streak,
       this.shields,
+      this.rageActiveTimer > 0
+        ? (this.rageActiveTimer / 7.5) * 100
+        : this.rageMeter,
+      this.rageActiveTimer > 0,
       this.getCurrentLevel(),
       this.getPrevTarget()
     );
-    this.refreshQuickSnipeState();
 
-    // 5. Check Drawdown Session End (live mode only)
     if (!this.isDemoMode && (this.shields <= 0 || this.dollars <= 0)) {
       this.endLiveSession();
     }
@@ -339,9 +605,7 @@ class ImbalanceGodOfWarGame {
 
   private async endLiveSession(): Promise<void> {
     this.isRunning = false;
-    this.hud.setQuickSnipeAvailable(false);
     const currentRealm = this.getCurrentLevel().name.toUpperCase();
-
     this.hud.showSessionEndOverlay(
       this.peakDollars,
       this.maxStreak,
@@ -367,6 +631,7 @@ class ImbalanceGodOfWarGame {
 
     const timeScale = this.chart.animations.getTimeScale(rawDt);
     const scaledDt = rawDt * timeScale;
+    this.elapsedTime += scaledDt;
 
     if (this.isRunning) {
       if (this.isDemoMode) {
@@ -382,22 +647,16 @@ class ImbalanceGodOfWarGame {
         }
       }
 
-      this.tickAccumulatorMs += scaledDt * 1000;
-      const baseInterval = this.getCurrentLevel().candleIntervalMs;
-      // Slightly slower pacing during the 1-minute manual training demo
-      const interval = this.isDemoMode ? baseInterval * 1.25 : baseInterval;
-
-      if (this.tickAccumulatorMs >= interval) {
-        this.tickAccumulatorMs = 0;
-        this.stepMarketTick();
-      }
+      this.updateSimulation(scaledDt);
     }
 
-    this.chart.render(scaledDt);
+    this.chart.updateCameraAndRender(scaledDt, this.runnerX, this.runnerY);
     requestAnimationFrame(this.loop);
   };
 }
 
+import * as THREE from 'three';
+
 window.addEventListener('DOMContentLoaded', () => {
-  new ImbalanceGodOfWarGame();
+  new ImbalanceSpartanRunner();
 });

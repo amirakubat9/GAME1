@@ -1,12 +1,6 @@
 export type MarketDirection = 'BULLISH' | 'BEARISH';
 
-export type FvgStatus =
-  | 'OPEN'
-  | 'ORDER_PLACED'
-  | 'MITIGATED'
-  | 'INVALIDATED_IFVG';
-
-export type FillQuality = 'SNIPER_CE' | 'PRECISION' | 'EDGE';
+export type FvgStatus = 'OPEN' | 'EXECUTED' | 'INVALIDATED_IFVG';
 
 export interface Candle {
   index: number;
@@ -29,12 +23,20 @@ export interface FairValueGap {
   ceMidpoint: number;
   status: FvgStatus;
   hasOrderBlockConfluence: boolean;
-  orderEntryPrice: number | null;
-  stopLossPrice: number | null;
-  fillQuality: FillQuality | null;
-  rrMultiplier: number;
-  createdTimestamp: number;
-  mitigatedAtIndex?: number;
+}
+
+export type WorldObjectKind =
+  | 'DOLLAR_ORB'
+  | 'ORDER_BLOCK_CHEST'
+  | 'HADES_SPIKE_TRAP';
+
+export interface WorldObject {
+  id: string;
+  kind: WorldObjectKind;
+  worldX: number;
+  worldY: number;
+  valueDollars: number;
+  collectedOrBroken: boolean;
 }
 
 export interface LevelConfig {
@@ -46,26 +48,10 @@ export interface LevelConfig {
   gridColor: number;
   pillarColor: number;
   brazierColor: number;
-  candleIntervalMs: number;
+  runSpeed: number;
   volatility: number;
-  sweepProbability: number;
-  orderBlockProbability: number;
-  newsSpikeProbability: number;
   targetBalance: number;
   description: string;
-}
-
-export interface TradeOutcome {
-  fvgId: string;
-  won: boolean;
-  dollarDelta: number;
-  fillQuality: FillQuality | null;
-  rrMultiplier: number;
-  streak: number;
-  headline: string;
-  subtext: string;
-  worldX: number;
-  worldY: number;
 }
 
 export interface LeaderboardEntry {

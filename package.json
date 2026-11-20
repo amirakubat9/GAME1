@@ -1,8 +1,8 @@
 {
-  "name": "imbalance-god-of-war-edition",
+  "name": "imbalance-wrath-of-olympus",
   "private": true,
-  "version": "2.0.0",
-  "description": "IMBALANCE: Wrath of Olympus — God of War II themed 3D Fair Value Gap (FVG) Price-Action Game",
+  "version": "3.0.0",
+  "description": "IMBALANCE: Wrath of Olympus — 3D Spartan Action & Fair Value Gap Trading Game",
   "type": "module",
   "scripts": {
     "dev": "vite",

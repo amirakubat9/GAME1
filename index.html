@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>IMBALANCE — Wrath of Olympus | 3D FVG Trading Game</title>
+    <title>IMBALANCE — Wrath of Olympus | 3D Spartan FVG Action</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Inter:wght@500;700;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Inter:wght@600;800;900&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/src/style.css" />
@@ -15,13 +15,13 @@
   <body>
     <canvas id="game-canvas"></canvas>
 
-    <!-- Floating Dollar Profit Popups Layer -->
+    <!-- Floating Dollar & Combo Popups -->
     <div id="floating-popups"></div>
 
-    <!-- Top Spartan / Institutional HUD -->
+    <!-- Top Spartan & Dollar HUD -->
     <header id="hud-top" class="hud-panel">
       <div class="brand-cluster">
-        <span id="realm-crest" class="brand-crest">Ω</span>
+        <span class="brand-crest">Ω</span>
         <div>
           <h1 class="brand-title">IMBALANCE</h1>
           <span id="session-badge" class="session-badge">REALM I · COLOSSUS OF RHODES</span>
@@ -30,89 +30,98 @@
 
       <div class="metrics-cluster">
         <div class="metric-box">
-          <span class="metric-label">ACCOUNT EQUITY</span>
+          <span class="metric-label">EQUITY</span>
           <span id="score-value" class="metric-value dollar-gold">$10,000</span>
         </div>
         <div class="metric-box">
-          <span class="metric-label">RAGE STREAK</span>
+          <span class="metric-label">COMBO</span>
           <span id="streak-value" class="metric-value streak-hot">0x</span>
         </div>
         <div class="metric-box">
           <span class="metric-label">SHIELDS</span>
-          <span id="lives-value" class="metric-value lives-ok">⚔️⚔️⚔️</span>
+          <span id="lives-value" class="metric-value">⚔️⚔️⚔️</span>
         </div>
-        <button id="mute-btn" class="icon-btn" title="Toggle War Drums & Synth" aria-label="Toggle Sound">🔊</button>
+        <button id="mute-btn" class="icon-btn" title="Toggle War Drums" aria-label="Toggle Sound">🔊</button>
       </div>
     </header>
 
-    <!-- Realm Ascension Progress Bar -->
-    <div id="level-progress-wrap">
-      <div id="level-progress-bar"></div>
+    <!-- Dual Progress Bars: Realm Ascension & Spartan Rage Meter -->
+    <div class="bars-container">
+      <div class="bar-group">
+        <span class="bar-tag">REALM ASCENSION</span>
+        <div class="bar-track">
+          <div id="level-progress-bar" class="bar-fill realm-fill"></div>
+        </div>
+      </div>
+      <div class="bar-group">
+        <span id="rage-label" class="bar-tag rage-tag">SPARTAN RAGE 0%</span>
+        <div class="bar-track">
+          <div id="rage-progress-bar" class="bar-fill rage-fill"></div>
+        </div>
+      </div>
     </div>
 
-    <!-- 1-Minute Guided Manual Demo Banner -->
+    <!-- 1-Minute Guided Demo Banner -->
     <div id="demo-banner" class="demo-banner hidden">
       <div class="demo-header">
-        <span class="demo-pill">1-MIN MANUAL TRAINING</span>
+        <span class="demo-pill">1-MIN SPARTAN TRAINING</span>
         <span id="demo-timer" class="demo-timer">01:00</span>
       </div>
-      <div id="demo-step-title" class="demo-step-title">STEP 1: SPOT THE 3-CANDLE GAP</div>
+      <div id="demo-step-title" class="demo-step-title">RUN, JUMP &amp; SLASH FAIR VALUE GAPS!</div>
       <p id="demo-step-desc" class="demo-step-desc">
-        Watch for a massive surge candle that leaves an empty glowing zone between Candle 1 and Candle 3.
+        Swipe UP / W to jump traps &amp; grab Gold Orbs. Tap / SLASH inside glowing FVG Bridges &amp; Treasure Chests!
       </p>
     </div>
 
-    <!-- Dynamic Floating Callout Toast -->
+    <!-- Dynamic Combat & Trade Callout -->
     <div id="callout-banner" class="callout hidden">
-      <div id="callout-title" class="callout-title">50% CE SNIPER STRIKE!</div>
-      <div id="callout-sub" class="callout-sub">+$1,500 · Blades of Chaos Bonus</div>
+      <div id="callout-title" class="callout-title">BLADES OF CHAOS STRIKE!</div>
+      <div id="callout-sub" class="callout-sub">+$1,500 · 50% CE Execution</div>
     </div>
 
-    <!-- Bottom Controls & Skip Demo / Quick Strike Bar -->
+    <!-- Bottom Action Controls (Mobile + Desktop Friendly) -->
     <footer id="hud-bottom">
-      <p id="hint-text" class="hint-text">
-        Tap inside a glowing <strong>FVG Bridge</strong> (aim for the gold <strong>50% CE line</strong>) to lock your order!
-      </p>
-      <div class="bottom-actions">
-        <button id="skip-demo-btn" class="skip-demo-btn hidden">
-          SKIP DEMO → ENTER LIVE MARKET
-        </button>
-        <button id="quick-snipe-btn" class="snipe-btn" disabled>
-          ⚔️ STRIKE 50% CE
-        </button>
-      </div>
+      <button id="jump-btn" class="action-pad-btn jump-pad">
+        ⬆️ JUMP <span class="key-hint">[W / SWIPE UP]</span>
+      </button>
+
+      <button id="skip-demo-btn" class="skip-demo-btn hidden">
+        SKIP DEMO → LIVE ARENA
+      </button>
+
+      <button id="slash-btn" class="action-pad-btn slash-pad">
+        ⚔️ BLADE SLASH / FVG SLAM <span class="key-hint">[SPACE / TAP]</span>
+      </button>
     </footer>
 
-    <!-- Main Title Screen / Session Summary Modal -->
+    <!-- Main Menu & Friends Leaderboard Modal -->
     <div id="overlay-screen" class="overlay">
       <div class="overlay-card">
-        <div class="overlay-kicker">GOD OF WAR II EDITION · PRICE-ACTION ARENA</div>
+        <div class="overlay-kicker">GOD OF WAR II · 3D ACTION TRADING ARENA</div>
         <h2 id="overlay-title" class="overlay-title">IMBALANCE</h2>
-        <p id="overlay-subtitle" class="overlay-subtitle">WRATH OF THE FAIR VALUE GAP</p>
+        <p id="overlay-subtitle" class="overlay-subtitle">BLADES OF THE FAIR VALUE GAP</p>
         <p id="overlay-desc" class="overlay-desc">
-          Command a <strong>$10,000</strong> Spartan trading war-chest. Spot 3-candle <strong>Fair Value Gaps</strong>,
-          strike the golden <strong>50% midpoint</strong> for <strong>+$1,500+</strong> orb payouts, and ascend through 5 mythic realms.
+          Sprint across 3D candlestick bridges as a <strong>Spartan Warrior</strong>! <strong>Jump</strong> over Hades spikes,
+          collect floating <strong>Dollar Orbs</strong>, smash <strong>Order Block Chests</strong>, and <strong>Blade-Slash</strong> inside glowing
+          <strong>Fair Value Gaps</strong> for massive <strong>+$1,500+</strong> payouts!
         </p>
 
-        <!-- Trader Name Input for Friends Leaderboard -->
         <div class="trader-input-row">
           <label for="player-name-input" class="trader-label">WARRIOR NAME</label>
           <input
             id="player-name-input"
             type="text"
-            maxlength="16"
-            placeholder="Enter your name..."
+            maxlength="14"
+            placeholder="KRATOS"
             value="KRATOS"
           />
         </div>
 
-        <!-- Primary Play & Demo Actions -->
         <div class="menu-btn-stack">
           <button id="play-btn" class="primary-btn">⚔️ PLAY</button>
-          <button id="watch-demo-btn" class="secondary-btn">📜 1-MIN HOW TO PLAY DEMO</button>
+          <button id="watch-demo-btn" class="secondary-btn">📜 1-MIN TRAINING DEMO</button>
         </div>
 
-        <!-- Friends & Rivals Leaderboard -->
         <div class="leaderboard-box">
           <div class="lb-header">
             <span class="lb-title">🏆 FRIENDS &amp; RIVALS LEADERBOARD</span>

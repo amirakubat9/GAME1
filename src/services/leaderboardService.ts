@@ -1,28 +1,26 @@
 import { LeaderboardEntry } from '../types/market';
 
-const STORAGE_KEY = 'imbalance_gow2_leaderboard_v1';
+const STORAGE_KEY = 'imbalance_gow2_leaderboard_v3';
 
-// Configure via Render Environment Variables (VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY)
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined) || '';
-const SUPABASE_ANON_KEY =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || '';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 const DEFAULT_RIVALS: LeaderboardEntry[] = [
   {
     player_name: 'ZEUS_ALGO',
-    peak_dollars: 28500,
-    best_streak: 6,
+    peak_dollars: 29500,
+    best_streak: 7,
     realm_reached: 'REALM IV · HADES',
   },
   {
     player_name: 'ATHENA_SMC',
-    peak_dollars: 21250,
-    best_streak: 4,
+    peak_dollars: 21750,
+    best_streak: 5,
     realm_reached: 'REALM III · CREATION',
   },
   {
     player_name: 'ARES_SCALP',
-    peak_dollars: 15750,
+    peak_dollars: 16250,
     best_streak: 3,
     realm_reached: 'REALM II · STEEDS',
   },
@@ -54,7 +52,7 @@ export class LeaderboardService {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(entries.slice(0, 15)));
     } catch {
-      // Ignore quota errors
+      // Ignore storage quota issues
     }
   }
 
@@ -75,7 +73,7 @@ export class LeaderboardService {
           if (rows.length > 0) return rows;
         }
       } catch {
-        // Fallback to local leaderboard if offline
+        // Fallback to local
       }
     }
 
@@ -83,7 +81,6 @@ export class LeaderboardService {
   }
 
   public async submitScore(entry: LeaderboardEntry): Promise<LeaderboardEntry[]> {
-    // Always update local cache immediately
     const local = this.loadLocal();
     local.push(entry);
     local.sort((a, b) => b.peak_dollars - a.peak_dollars);
@@ -107,7 +104,7 @@ export class LeaderboardService {
           }),
         });
       } catch {
-        // Ignore network errors and keep local record
+        // Keep local copy
       }
     }
 

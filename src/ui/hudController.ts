@@ -1,5 +1,5 @@
-import { LeaderboardEntry, LevelConfig, TradeOutcome } from '../types/market';
 import { STARTING_DOLLARS } from '../engine/fvgEngine';
+import { LeaderboardEntry, LevelConfig } from '../types/market';
 
 export class HudController {
   private sessionBadge = document.getElementById('session-badge')!;
@@ -7,12 +7,11 @@ export class HudController {
   private streakValue = document.getElementById('streak-value')!;
   private livesValue = document.getElementById('lives-value')!;
   private progressBar = document.getElementById('level-progress-bar')!;
+  private rageBar = document.getElementById('rage-progress-bar')!;
+  private rageLabel = document.getElementById('rage-label')!;
   private calloutBanner = document.getElementById('callout-banner')!;
   private calloutTitle = document.getElementById('callout-title')!;
   private calloutSub = document.getElementById('callout-sub')!;
-  private quickSnipeBtn = document.getElementById(
-    'quick-snipe-btn'
-  ) as HTMLButtonElement;
   private skipDemoBtn = document.getElementById(
     'skip-demo-btn'
   ) as HTMLButtonElement;
@@ -35,6 +34,8 @@ export class HudController {
     dollars: number,
     streak: number,
     shields: number,
+    ragePct: number,
+    isRageActive: boolean,
     level: LevelConfig,
     prevTarget: number
   ): void {
@@ -51,6 +52,12 @@ export class HudController {
       Math.max(0, ((dollars - prevTarget) / span) * 100)
     );
     this.progressBar.style.width = `${pct}%`;
+
+    const clampedRage = Math.min(100, Math.max(0, Math.round(ragePct)));
+    this.rageBar.style.width = `${clampedRage}%`;
+    this.rageLabel.textContent = isRageActive
+      ? '🔥 SPARTAN RAGE ACTIVE (2X $)!'
+      : `SPARTAN RAGE ${clampedRage}%`;
   }
 
   public spawnDollarPopup(
@@ -64,14 +71,10 @@ export class HudController {
     el.textContent = isLoss
       ? `-$${Math.abs(dollarDelta).toLocaleString()}`
       : `+$${dollarDelta.toLocaleString()}`;
-    el.style.left = `${Math.min(window.innerWidth - 60, Math.max(60, screenX))}px`;
-    el.style.top = `${Math.min(window.innerHeight - 90, Math.max(110, screenY))}px`;
+    el.style.left = `${Math.min(window.innerWidth - 65, Math.max(65, screenX))}px`;
+    el.style.top = `${Math.min(window.innerHeight - 95, Math.max(115, screenY))}px`;
     this.floatingPopups.appendChild(el);
-    window.setTimeout(() => el.remove(), 1400);
-  }
-
-  public setQuickSnipeAvailable(available: boolean): void {
-    this.quickSnipeBtn.disabled = !available;
+    window.setTimeout(() => el.remove(), 1300);
   }
 
   public setDemoModeUI(
@@ -109,11 +112,7 @@ export class HudController {
     }
     this.calloutTimer = window.setTimeout(() => {
       this.calloutBanner.classList.add('hidden');
-    }, 2300);
-  }
-
-  public showOutcome(outcome: TradeOutcome): void {
-    this.showCallout(outcome.headline, outcome.subtext, !outcome.won);
+    }, 2100);
   }
 
   public hideOverlay(): void {
@@ -133,7 +132,7 @@ export class HudController {
 
     this.overlayTitle.textContent = 'FALLEN IN BATTLE';
     this.overlaySubtitle.textContent = 'MARGIN CALL · SESSION COMPLETE';
-    this.overlayDesc.innerHTML = `Peak Equity: <strong>$${peakDollars.toLocaleString()}</strong> (${profitText}) · Best Rage Streak: <strong>${maxStreak}x</strong> · Reached <strong>${realmName}</strong>.`;
+    this.overlayDesc.innerHTML = `Peak Equity: <strong>$${peakDollars.toLocaleString()}</strong> (${profitText}) · Best Combo: <strong>${maxStreak}x</strong> · Reached <strong>${realmName}</strong>.`;
     this.playBtn.textContent = '⚔️ PLAY AGAIN';
     this.overlayScreen.classList.remove('hidden');
   }
@@ -147,7 +146,7 @@ export class HudController {
     this.lbSyncBadge.classList.toggle('cloud', isCloud);
 
     this.leaderboardList.innerHTML = entries
-      .slice(0, 6)
+      .slice(0, 5)
       .map((item, idx) => {
         const isMe =
           item.player_name.toUpperCase() === currentPlayer.toUpperCase();
@@ -157,7 +156,7 @@ export class HudController {
               <span class="lb-rank">#${idx + 1}</span>
               <div>
                 <div class="lb-name">${item.player_name}</div>
-                <div class="lb-meta">${item.realm_reached} · ${item.best_streak}x Streak</div>
+                <div class="lb-meta">${item.realm_reached} · ${item.best_streak}x Combo</div>
               </div>
             </div>
             <div class="lb-dollars">$${item.peak_dollars.toLocaleString()}</div>
