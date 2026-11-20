@@ -10,11 +10,6 @@ type CyclePhase =
   | 'RETRACE_TAP'
   | 'EXPANSION';
 
-/**
- * Generates realistic institutional price action cycles:
- * Accumulation Drift -> Liquidity Sweep -> 3-Candle Displacement (forming an FVG)
- * -> Retracement into the FVG -> Rejection Bounce (or News Blow-Through).
- */
 export class PriceActionGenerator {
   private candles: Candle[] = [];
   private phase: CyclePhase = 'DRIFT';
@@ -37,11 +32,11 @@ export class PriceActionGenerator {
 
     let price = 100;
     for (let i = 0; i < 10; i++) {
-      const delta = (Math.random() - 0.5) * 1.4;
+      const delta = (Math.random() - 0.5) * 1.3;
       const open = price;
       const close = price + delta;
-      const high = Math.max(open, close) + 0.3 + Math.random() * 0.5;
-      const low = Math.min(open, close) - 0.3 - Math.random() * 0.5;
+      const high = Math.max(open, close) + 0.3 + Math.random() * 0.45;
+      const low = Math.min(open, close) - 0.3 - Math.random() * 0.45;
       this.candles.push({
         index: i,
         open,
@@ -62,7 +57,7 @@ export class PriceActionGenerator {
     this.activeTargetGap = gap;
   }
 
-  public nextCandle(level: LevelConfig): Candle {
+  public nextCandle(level: LevelConfig, forceCleanBounce = false): Candle {
     const prev = this.candles[this.candles.length - 1];
     const index = prev.index + 1;
     const vol = level.volatility;
@@ -77,19 +72,17 @@ export class PriceActionGenerator {
 
     switch (this.phase) {
       case 'DRIFT': {
-        // Mean-reverting consolidation toward 100
-        const pullToCenter = (100 - open) * 0.14;
-        const step = pullToCenter + (Math.random() - 0.5) * 1.3 * vol;
+        const pullToCenter = (100 - open) * 0.15;
+        const step = pullToCenter + (Math.random() - 0.5) * 1.25 * vol;
         close = open + step;
-        high = Math.max(open, close) + (0.25 + Math.random() * 0.45) * vol;
-        low = Math.min(open, close) - (0.25 + Math.random() * 0.45) * vol;
+        high = Math.max(open, close) + (0.25 + Math.random() * 0.4) * vol;
+        low = Math.min(open, close) - (0.25 + Math.random() * 0.4) * vol;
 
         this.phaseStep++;
         if (this.phaseStep >= 2) {
           this.phaseStep = 0;
-          // Choose next impulse direction away from extremes
-          if (open > 112) this.cycleDirection = 'BEARISH';
-          else if (open < 88) this.cycleDirection = 'BULLISH';
+          if (open > 111) this.cycleDirection = 'BEARISH';
+          else if (open < 89) this.cycleDirection = 'BULLISH';
           else this.cycleDirection = Math.random() > 0.5 ? 'BULLISH' : 'BEARISH';
 
           this.phase =
@@ -99,16 +92,13 @@ export class PriceActionGenerator {
       }
 
       case 'SWEEP': {
-        // Liquidity grab in the opposite direction before reversal
         isLiquiditySweep = true;
         if (this.cycleDirection === 'BULLISH') {
-          const sweepLow = prev.low - (1.1 + Math.random() * 0.9) * vol;
-          low = sweepLow;
+          low = prev.low - (1.1 + Math.random() * 0.8) * vol;
           close = open + (0.2 + Math.random() * 0.4) * vol;
           high = close + 0.3 * vol;
         } else {
-          const sweepHigh = prev.high + (1.1 + Math.random() * 0.9) * vol;
-          high = sweepHigh;
+          high = prev.high + (1.1 + Math.random() * 0.8) * vol;
           close = open - (0.2 + Math.random() * 0.4) * vol;
           low = close - 0.3 * vol;
         }
@@ -117,14 +107,13 @@ export class PriceActionGenerator {
       }
 
       case 'IMPULSE_1': {
-        // Candle 1 of 3-candle FVG pattern (often forms an Order Block)
         hasOrderBlock = Math.random() < level.orderBlockProbability;
         if (this.cycleDirection === 'BULLISH') {
-          close = open + (0.5 + Math.random() * 0.6) * vol;
+          close = open + (0.5 + Math.random() * 0.55) * vol;
           high = close + 0.35 * vol;
           low = open - 0.4 * vol;
         } else {
-          close = open - (0.5 + Math.random() * 0.6) * vol;
+          close = open - (0.5 + Math.random() * 0.55) * vol;
           low = close - 0.35 * vol;
           high = open + 0.4 * vol;
         }
@@ -135,9 +124,8 @@ export class PriceActionGenerator {
       }
 
       case 'IMPULSE_2': {
-        // Candle 2: Massive displacement candle that rips open the FVG
-        isNewsSpike = Math.random() < level.newsSpikeProbability;
-        const burst = (isNewsSpike ? 3.8 : 2.7 + Math.random() * 0.9) * vol;
+        isNewsSpike = !forceCleanBounce && Math.random() < level.newsSpikeProbability;
+        const burst = (isNewsSpike ? 3.8 : 2.8 + Math.random() * 0.8) * vol;
         if (this.cycleDirection === 'BULLISH') {
           close = open + burst;
           high = close + 0.3 * vol;
@@ -152,16 +140,15 @@ export class PriceActionGenerator {
       }
 
       case 'IMPULSE_3': {
-        // Candle 3: Leaves a clean wick gap from Candle 1
         if (this.cycleDirection === 'BULLISH') {
-          const minLow = this.anchorC1High + 1.15 * vol;
+          const minLow = this.anchorC1High + 1.2 * vol;
           low = Math.max(open - 0.35 * vol, minLow);
-          close = Math.max(open + 0.7 * vol, low + 0.8 * vol);
+          close = Math.max(open + 0.7 * vol, low + 0.85 * vol);
           high = close + 0.4 * vol;
         } else {
-          const maxHigh = this.anchorC1Low - 1.15 * vol;
+          const maxHigh = this.anchorC1Low - 1.2 * vol;
           high = Math.min(open + 0.35 * vol, maxHigh);
-          close = Math.min(open - 0.7 * vol, high - 0.8 * vol);
+          close = Math.min(open - 0.7 * vol, high - 0.85 * vol);
           low = close - 0.4 * vol;
         }
         this.phase = 'WAIT_BUFFER';
@@ -169,14 +156,13 @@ export class PriceActionGenerator {
       }
 
       case 'WAIT_BUFFER': {
-        // Gives the player 1-2 beats to spot the glowing FVG and tap their entry
         if (this.cycleDirection === 'BULLISH') {
-          close = open + (0.2 + Math.random() * 0.4) * vol;
-          high = close + 0.35 * vol;
+          close = open + (0.2 + Math.random() * 0.35) * vol;
+          high = close + 0.3 * vol;
           low = open - 0.25 * vol;
         } else {
-          close = open - (0.2 + Math.random() * 0.4) * vol;
-          low = close - 0.35 * vol;
+          close = open - (0.2 + Math.random() * 0.35) * vol;
+          low = close - 0.3 * vol;
           high = open + 0.25 * vol;
         }
         this.phaseStep++;
@@ -188,9 +174,10 @@ export class PriceActionGenerator {
       }
 
       case 'RETRACE_TAP': {
-        // Price retraces straight into the FVG (either bouncing at CE or blowing through)
         const gap = this.activeTargetGap;
-        const blowThroughChance = 0.22 + level.newsSpikeProbability * 0.35;
+        const blowThroughChance = forceCleanBounce
+          ? 0
+          : 0.22 + level.newsSpikeProbability * 0.35;
         const willBlowThrough = Math.random() < blowThroughChance;
 
         if (gap && gap.status !== 'MITIGATED' && gap.status !== 'INVALIDATED_IFVG') {
@@ -205,7 +192,7 @@ export class PriceActionGenerator {
             } else {
               low = Math.min(targetTap - 0.12, gap.ceMidpoint);
               low = Math.max(low, gap.bottom + 0.08);
-              close = gap.top + 0.65 * vol;
+              close = gap.top + 0.7 * vol;
               high = close + 0.45 * vol;
             }
           } else {
@@ -216,12 +203,12 @@ export class PriceActionGenerator {
             } else {
               high = Math.max(targetTap + 0.12, gap.ceMidpoint);
               high = Math.min(high, gap.top - 0.08);
-              close = gap.bottom - 0.65 * vol;
+              close = gap.bottom - 0.7 * vol;
               low = close - 0.45 * vol;
             }
           }
         } else {
-          close = open + (Math.random() - 0.5) * 1.5 * vol;
+          close = open + (Math.random() - 0.5) * 1.4 * vol;
           high = Math.max(open, close) + 0.4 * vol;
           low = Math.min(open, close) - 0.4 * vol;
         }
@@ -233,11 +220,11 @@ export class PriceActionGenerator {
 
       case 'EXPANSION': {
         if (this.cycleDirection === 'BULLISH') {
-          close = open + (0.8 + Math.random() * 0.7) * vol;
+          close = open + (0.8 + Math.random() * 0.65) * vol;
           high = close + 0.4 * vol;
           low = open - 0.2 * vol;
         } else {
-          close = open - (0.8 + Math.random() * 0.7) * vol;
+          close = open - (0.8 + Math.random() * 0.65) * vol;
           low = close - 0.4 * vol;
           high = open + 0.2 * vol;
         }

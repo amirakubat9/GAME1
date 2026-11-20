@@ -3,90 +3,123 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>IMBALANCE — 3D Fair Value Gap Arcade</title>
+    <title>IMBALANCE — Wrath of Olympus | 3D FVG Trading Game</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Inter:wght@500;700;800;900&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <canvas id="game-canvas"></canvas>
 
-    <!-- Top Institutional HUD -->
+    <!-- Floating Dollar Profit Popups Layer -->
+    <div id="floating-popups"></div>
+
+    <!-- Top Spartan / Institutional HUD -->
     <header id="hud-top" class="hud-panel">
       <div class="brand-cluster">
-        <span class="brand-dot"></span>
+        <span id="realm-crest" class="brand-crest">Ω</span>
         <div>
           <h1 class="brand-title">IMBALANCE</h1>
-          <span id="session-badge" class="session-badge">LVL 1 · 4H SWING</span>
+          <span id="session-badge" class="session-badge">REALM I · COLOSSUS OF RHODES</span>
         </div>
       </div>
 
       <div class="metrics-cluster">
         <div class="metric-box">
-          <span class="metric-label">P&amp;L SCORE</span>
-          <span id="score-value" class="metric-value">0</span>
+          <span class="metric-label">ACCOUNT EQUITY</span>
+          <span id="score-value" class="metric-value dollar-gold">$10,000</span>
         </div>
         <div class="metric-box">
-          <span class="metric-label">STREAK</span>
+          <span class="metric-label">RAGE STREAK</span>
           <span id="streak-value" class="metric-value streak-hot">0x</span>
         </div>
         <div class="metric-box">
-          <span class="metric-label">EQUITY</span>
-          <span id="lives-value" class="metric-value lives-ok">■■■</span>
+          <span class="metric-label">SHIELDS</span>
+          <span id="lives-value" class="metric-value lives-ok">⚔️⚔️⚔️</span>
         </div>
-        <button id="mute-btn" class="icon-btn" title="Toggle Synth Audio" aria-label="Toggle Sound">🔊</button>
+        <button id="mute-btn" class="icon-btn" title="Toggle War Drums & Synth" aria-label="Toggle Sound">🔊</button>
       </div>
     </header>
 
-    <!-- Level Progress Bar -->
+    <!-- Realm Ascension Progress Bar -->
     <div id="level-progress-wrap">
       <div id="level-progress-bar"></div>
     </div>
 
-    <!-- Dynamic Floating Callout Toast -->
-    <div id="callout-banner" class="callout hidden">
-      <div id="callout-title" class="callout-title">SNIPER CE FILL!</div>
-      <div id="callout-sub" class="callout-sub">50% Consequent Encroachment · 3.0x R:R</div>
+    <!-- 1-Minute Guided Manual Demo Banner -->
+    <div id="demo-banner" class="demo-banner hidden">
+      <div class="demo-header">
+        <span class="demo-pill">1-MIN MANUAL TRAINING</span>
+        <span id="demo-timer" class="demo-timer">01:00</span>
+      </div>
+      <div id="demo-step-title" class="demo-step-title">STEP 1: SPOT THE 3-CANDLE GAP</div>
+      <p id="demo-step-desc" class="demo-step-desc">
+        Watch for a massive surge candle that leaves an empty glowing zone between Candle 1 and Candle 3.
+      </p>
     </div>
 
-    <!-- Bottom Controls & Quick-Snipe Bar -->
+    <!-- Dynamic Floating Callout Toast -->
+    <div id="callout-banner" class="callout hidden">
+      <div id="callout-title" class="callout-title">50% CE SNIPER STRIKE!</div>
+      <div id="callout-sub" class="callout-sub">+$1,500 · Blades of Chaos Bonus</div>
+    </div>
+
+    <!-- Bottom Controls & Skip Demo / Quick Strike Bar -->
     <footer id="hud-bottom">
       <p id="hint-text" class="hint-text">
-        Tap/Click inside a glowing <strong>FVG Zone</strong> (aim for the dashed <strong>50% CE line</strong>) before price retraces!
+        Tap inside a glowing <strong>FVG Bridge</strong> (aim for the gold <strong>50% CE line</strong>) to lock your order!
       </p>
-      <button id="quick-snipe-btn" class="snipe-btn" disabled>
-        🎯 LOCK 50% CE ENTRY
-      </button>
+      <div class="bottom-actions">
+        <button id="skip-demo-btn" class="skip-demo-btn hidden">
+          SKIP DEMO → ENTER LIVE MARKET
+        </button>
+        <button id="quick-snipe-btn" class="snipe-btn" disabled>
+          ⚔️ STRIKE 50% CE
+        </button>
+      </div>
     </footer>
 
-    <!-- Start / Re-Enter Modal Overlay -->
+    <!-- Main Title Screen / Session Summary Modal -->
     <div id="overlay-screen" class="overlay">
       <div class="overlay-card">
-        <div class="overlay-kicker">PRICE-ACTION ARCADE · SMC ENGINE</div>
+        <div class="overlay-kicker">GOD OF WAR II EDITION · PRICE-ACTION ARENA</div>
         <h2 id="overlay-title" class="overlay-title">IMBALANCE</h2>
+        <p id="overlay-subtitle" class="overlay-subtitle">WRATH OF THE FAIR VALUE GAP</p>
         <p id="overlay-desc" class="overlay-desc">
-          Spot 3-candle <strong>Fair Value Gaps</strong> as displacement rips open. Lock your limit order near the
-          <strong>50% Consequent Encroachment</strong> line and ride the institutional bounce before a stop-hunt flips the gap!
+          Command a <strong>$10,000</strong> Spartan trading war-chest. Spot 3-candle <strong>Fair Value Gaps</strong>,
+          strike the golden <strong>50% midpoint</strong> for <strong>+$1,500+</strong> orb payouts, and ascend through 5 mythic realms.
         </p>
 
-        <div class="legend-grid">
-          <div class="legend-item">
-            <span class="swatch bull"></span>
-            <span>Bullish FVG (Tap to Buy)</span>
-          </div>
-          <div class="legend-item">
-            <span class="swatch bear"></span>
-            <span>Bearish FVG (Tap to Sell)</span>
-          </div>
-          <div class="legend-item">
-            <span class="swatch ce"></span>
-            <span>50% CE Line = 3.0x Sniper</span>
-          </div>
-          <div class="legend-item">
-            <span class="swatch ifvg"></span>
-            <span>Invalidated = IFVG Flip</span>
-          </div>
+        <!-- Trader Name Input for Friends Leaderboard -->
+        <div class="trader-input-row">
+          <label for="player-name-input" class="trader-label">WARRIOR NAME</label>
+          <input
+            id="player-name-input"
+            type="text"
+            maxlength="16"
+            placeholder="Enter your name..."
+            value="KRATOS"
+          />
         </div>
 
-        <button id="start-btn" class="primary-btn">ENTER MARKET SESSION</button>
+        <!-- Primary Play & Demo Actions -->
+        <div class="menu-btn-stack">
+          <button id="play-btn" class="primary-btn">⚔️ PLAY</button>
+          <button id="watch-demo-btn" class="secondary-btn">📜 1-MIN HOW TO PLAY DEMO</button>
+        </div>
+
+        <!-- Friends & Rivals Leaderboard -->
+        <div class="leaderboard-box">
+          <div class="lb-header">
+            <span class="lb-title">🏆 FRIENDS &amp; RIVALS LEADERBOARD</span>
+            <span id="lb-sync-badge" class="lb-badge">LOCAL ARENA</span>
+          </div>
+          <div id="leaderboard-list" class="lb-list"></div>
+        </div>
       </div>
     </div>
 

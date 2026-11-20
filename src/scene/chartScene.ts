@@ -29,8 +29,7 @@ export function worldYToPrice(y: number): number {
 }
 
 /**
- * Renders the 3D institutional candlestick chart, glowing Fair Value Gap bridges,
- * 50% Consequent Encroachment (CE) equilibrium lines, and touch/mouse raycasting.
+ * 3D Greco-Roman Olympus Arena + Candlestick & Fair Value Gap Chart
  */
 export class ChartScene {
   public readonly scene: THREE.Scene;
@@ -39,6 +38,11 @@ export class ChartScene {
   public readonly animations: AnimationController;
 
   private gridHelper: THREE.GridHelper;
+  private templeGroup: THREE.Group;
+  private pillarMaterial: THREE.MeshStandardMaterial;
+  private brazierMaterial: THREE.MeshBasicMaterial;
+  private rimLight: THREE.PointLight;
+
   private candleVisuals = new Map<number, CandleVisual>();
   private fvgVisuals = new Map<string, FvgVisual>();
   private raycaster = new THREE.Raycaster();
@@ -57,7 +61,7 @@ export class ChartScene {
     this.onGapSelected = onGapSelected;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x060913, 0.022);
+    this.scene.fog = new THREE.FogExp2(0x160e07, 0.022);
 
     this.camera = new THREE.PerspectiveCamera(
       48,
@@ -75,22 +79,33 @@ export class ChartScene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
 
-    // Three-point institutional lighting
-    const ambient = new THREE.AmbientLight(0x9fb8ff, 0.85);
+    const ambient = new THREE.AmbientLight(0xffddb3, 0.9);
     this.scene.add(ambient);
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.35);
+    const keyLight = new THREE.DirectionalLight(0xfff1d6, 1.45);
     keyLight.position.set(8, 18, 16);
     this.scene.add(keyLight);
 
-    const rimLight = new THREE.PointLight(0x00f5a0, 2.2, 45);
-    rimLight.position.set(0, 8, 8);
-    this.scene.add(rimLight);
+    this.rimLight = new THREE.PointLight(0xff8c1a, 2.8, 55);
+    this.rimLight.position.set(0, 7, 7);
+    this.scene.add(this.rimLight);
 
-    // Perspective market floor grid
-    this.gridHelper = new THREE.GridHelper(160, 80, 0x223b70, 0x111d38);
+    this.gridHelper = new THREE.GridHelper(180, 90, 0x5c3a18, 0x160e07);
     this.gridHelper.position.y = -11;
     this.scene.add(this.gridHelper);
+
+    // Build Greco-Roman Marble Columns & Burning Fire Braziers
+    this.pillarMaterial = new THREE.MeshStandardMaterial({
+      color: 0xb89668,
+      roughness: 0.55,
+      metalness: 0.25,
+    });
+    this.brazierMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff8c1a,
+    });
+    this.templeGroup = new THREE.Group();
+    this.buildTempleColonnade();
+    this.scene.add(this.templeGroup);
 
     this.animations = new AnimationController(this.scene);
 
@@ -98,13 +113,50 @@ export class ChartScene {
     canvas.addEventListener('pointerdown', this.handlePointerDown);
   }
 
+  private buildTempleColonnade(): void {
+    const colGeom = new THREE.CylinderGeometry(0.65, 0.8, 24, 14);
+    const capGeom = new THREE.BoxGeometry(2.1, 0.7, 2.1);
+    const flameGeom = new THREE.OctahedronGeometry(0.55, 1);
+
+    for (let i = -5; i <= 5; i++) {
+      const x = i * 14;
+      const pillar = new THREE.Mesh(colGeom, this.pillarMaterial);
+      pillar.position.set(x, 1, -7.5);
+      this.templeGroup.add(pillar);
+
+      const topCap = new THREE.Mesh(capGeom, this.pillarMaterial);
+      topCap.position.set(x, 13, -7.5);
+      this.templeGroup.add(topCap);
+
+      const baseCap = new THREE.Mesh(capGeom, this.pillarMaterial);
+      baseCap.position.set(x, -10.6, -7.5);
+      this.templeGroup.add(baseCap);
+
+      // Foreground burning brazier bowl + flame
+      const bowl = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.75, 0.35, 0.8, 12),
+        this.pillarMaterial
+      );
+      bowl.position.set(x + 7, -10.5, -3.8);
+      this.templeGroup.add(bowl);
+
+      const flame = new THREE.Mesh(flameGeom, this.brazierMaterial);
+      flame.position.set(x + 7, -9.6, -3.8);
+      this.templeGroup.add(flame);
+    }
+  }
+
   public applyLevelTheme(level: LevelConfig): void {
     this.scene.fog = new THREE.FogExp2(level.fogColor, 0.022);
     this.renderer.setClearColor(level.fogColor, 1);
+    this.pillarMaterial.color.setHex(level.pillarColor);
+    this.brazierMaterial.color.setHex(level.brazierColor);
+    this.rimLight.color.setHex(level.brazierColor);
+
     this.scene.remove(this.gridHelper);
     this.gridHelper = new THREE.GridHelper(
-      160,
-      80,
+      180,
+      90,
       level.gridColor,
       level.fogColor
     );
@@ -124,6 +176,15 @@ export class ChartScene {
     this.fvgVisuals.clear();
   }
 
+  public worldToScreen(worldX: number, worldY: number): { x: number; y: number } {
+    const vec = new THREE.Vector3(worldX, worldY, 0);
+    vec.project(this.camera);
+    return {
+      x: (vec.x * 0.5 + 0.5) * window.innerWidth,
+      y: (-vec.y * 0.5 + 0.5) * window.innerHeight,
+    };
+  }
+
   public syncCandles(candles: Candle[]): void {
     const activeIds = new Set<number>();
 
@@ -141,12 +202,11 @@ export class ChartScene {
         });
 
         if (candle.isNewsSpike) {
-          this.animations.triggerCameraShake(0.65);
+          this.animations.triggerCameraShake(0.7);
         }
       }
     }
 
-    // Prune old candles far behind camera
     for (const [idx, cv] of this.candleVisuals.entries()) {
       if (!activeIds.has(idx)) {
         this.scene.remove(cv.group);
@@ -159,6 +219,8 @@ export class ChartScene {
       this.targetCameraX = latest.index * CANDLE_SPACING_X - 2.5;
       this.targetCameraY = priceToWorldY(latest.close) * 0.55;
       this.gridHelper.position.x = this.targetCameraX;
+      // Keep temple colonnade endlessly wrapping around camera
+      this.templeGroup.position.x = Math.floor(this.targetCameraX / 14) * 14;
     }
   }
 
@@ -166,10 +228,10 @@ export class ChartScene {
     const group = new THREE.Group();
     const isBull = candle.close >= candle.open;
     const color = candle.isNewsSpike
-      ? 0xfbbf24
+      ? 0xffd166
       : isBull
-      ? 0x00f5a0
-      : 0xf43f5e;
+      ? 0x10b981
+      : 0xe11d48;
 
     const openY = priceToWorldY(candle.open);
     const closeY = priceToWorldY(candle.close);
@@ -183,9 +245,9 @@ export class ChartScene {
     const bodyMat = new THREE.MeshPhysicalMaterial({
       color,
       emissive: color,
-      emissiveIntensity: candle.isNewsSpike ? 0.55 : 0.28,
+      emissiveIntensity: candle.isNewsSpike ? 0.6 : 0.3,
       roughness: 0.22,
-      metalness: 0.15,
+      metalness: 0.18,
     });
     const bodyMesh = new THREE.Mesh(bodyGeom, bodyMat);
     bodyMesh.position.y = bodyCenterY;
@@ -199,7 +261,6 @@ export class ChartScene {
     wickMesh.position.y = wickCenterY;
     group.add(wickMesh);
 
-    // Highlight Liquidity Sweep ring at wick extreme
     if (candle.isLiquiditySweep) {
       const sweepGeom = new THREE.RingGeometry(0.28, 0.44, 20);
       const sweepMat = new THREE.MeshBasicMaterial({
@@ -242,7 +303,7 @@ export class ChartScene {
   private buildFvgMesh(gap: FairValueGap): FvgVisual {
     const group = new THREE.Group();
     const isBull = gap.direction === 'BULLISH';
-    const baseColor = isBull ? 0x00f5a0 : 0x38bdf8;
+    const baseColor = isBull ? 0x10b981 : 0x38bdf8;
 
     const topY = priceToWorldY(gap.top);
     const bottomY = priceToWorldY(gap.bottom);
@@ -251,14 +312,13 @@ export class ChartScene {
     const centerY = (topY + bottomY) * 0.5;
     const width = 9.5;
 
-    // Translucent interactive FVG zone box
     const zoneGeom = new THREE.BoxGeometry(width, height, 0.35);
     const zoneMat = new THREE.MeshPhysicalMaterial({
       color: baseColor,
       emissive: baseColor,
       emissiveIntensity: 0.35,
       transparent: true,
-      opacity: 0.34,
+      opacity: 0.36,
       roughness: 0.15,
     });
     const zoneMesh = new THREE.Mesh(zoneGeom, zoneMat);
@@ -270,17 +330,15 @@ export class ChartScene {
     zoneMesh.userData = { fvgId: gap.id };
     group.add(zoneMesh);
 
-    // 50% Consequent Encroachment (CE) equilibrium beam
-    const ceGeom = new THREE.BoxGeometry(width, 0.07, 0.44);
+    const ceGeom = new THREE.BoxGeometry(width, 0.08, 0.45);
     const ceMat = new THREE.MeshBasicMaterial({
-      color: 0xfbbf24,
+      color: 0xffd166,
     });
     const ceLineMesh = new THREE.Mesh(ceGeom, ceMat);
     ceLineMesh.position.set(zoneMesh.position.x, ceY, 0.05);
     group.add(ceLineMesh);
 
-    // Player Limit Order line (hidden until placed)
-    const entryGeom = new THREE.BoxGeometry(width + 0.3, 0.11, 0.52);
+    const entryGeom = new THREE.BoxGeometry(width + 0.35, 0.12, 0.54);
     const entryMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
     });
@@ -306,33 +364,43 @@ export class ChartScene {
     if (gap.status === 'ORDER_PLACED' && gap.orderEntryPrice !== null) {
       entryLineMesh.visible = true;
       entryLineMesh.position.y = priceToWorldY(gap.orderEntryPrice);
-      mat.opacity = 0.52;
-      mat.emissiveIntensity = 0.6;
-    } else if (gap.status === 'MITIGATED') {
-      mat.color.setHex(0xfbbf24);
-      mat.emissive.setHex(0xfbbf24);
-      mat.opacity = 0.16;
-      mat.emissiveIntensity = 0.25;
-    } else if (gap.status === 'INVALIDATED_IFVG') {
-      mat.color.setHex(0xf43f5e);
-      mat.emissive.setHex(0xf43f5e);
-      mat.opacity = 0.42;
+      mat.opacity = 0.55;
       mat.emissiveIntensity = 0.65;
+    } else if (gap.status === 'MITIGATED') {
+      mat.color.setHex(0xffd166);
+      mat.emissive.setHex(0xffd166);
+      mat.opacity = 0.18;
+      mat.emissiveIntensity = 0.3;
+    } else if (gap.status === 'INVALIDATED_IFVG') {
+      mat.color.setHex(0xe11d48);
+      mat.emissive.setHex(0xe11d48);
+      mat.opacity = 0.44;
+      mat.emissiveIntensity = 0.7;
     }
   }
 
-  public triggerGapFeedback(gap: FairValueGap, won: boolean): void {
+  public triggerGapFeedback(
+    gap: FairValueGap,
+    won: boolean,
+    isSniper = false
+  ): void {
     const visual = this.fvgVisuals.get(gap.id);
     if (!visual) return;
 
     const pos = visual.zoneMesh.position.clone();
     pos.z = 0.5;
-    const color = won ? 0x00f5a0 : 0xf43f5e;
-    this.animations.spawnShockwave(pos, color);
-    this.animations.spawnParticles(pos, color, won ? 32 : 24);
 
-    if (!won) {
-      this.animations.triggerCameraShake(0.8);
+    if (won) {
+      this.animations.spawnShockwave(pos, 0xffd166);
+      this.animations.spawnBladeSlash(pos, isSniper);
+      this.animations.spawnOlympusOrbs(pos, isSniper ? 36 : 22, false);
+      if (isSniper) {
+        this.animations.spawnVictoryBeam(pos);
+      }
+    } else {
+      this.animations.spawnShockwave(pos, 0xe11d48);
+      this.animations.spawnOlympusOrbs(pos, 18, true);
+      this.animations.triggerCameraShake(0.85);
       visual.flipRotation = Math.PI;
     }
   }
@@ -364,18 +432,15 @@ export class ChartScene {
   };
 
   public render(dt: number): void {
-    // Animate hydraulic candle growth
     for (const cv of this.candleVisuals.values()) {
       if (cv.spawnProgress < 1) {
         cv.spawnProgress = Math.min(1, cv.spawnProgress + dt * 5.2);
-        // Overshoot easeOutBack
         const t = cv.spawnProgress - 1;
         const scale = 1 + 2.2 * t * t * t + 1.2 * t * t;
         cv.group.scale.set(scale, scale, scale);
       }
     }
 
-    // Animate IFVG 180-degree barrel-roll polarity flip
     for (const fv of this.fvgVisuals.values()) {
       if (fv.flipRotation > 0) {
         const step = Math.min(fv.flipRotation, dt * 9.5);
@@ -386,7 +451,6 @@ export class ChartScene {
 
     this.animations.update(dt);
 
-    // Smooth camera follow + shake / zoom punch
     const { shakeX, shakeY, zoomOffset } = this.animations.getCameraOffsets(dt);
     this.camera.position.x +=
       (this.targetCameraX - this.camera.position.x) * Math.min(1, dt * 4.5) +

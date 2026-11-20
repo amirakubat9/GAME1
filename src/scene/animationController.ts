@@ -6,23 +6,39 @@ interface Shockwave {
   maxAge: number;
 }
 
-interface ParticleBurst {
-  points: THREE.Points;
-  velocities: Float32Array;
+interface BladeSlash {
+  mesh: THREE.Mesh;
+  age: number;
+  maxAge: number;
+  spinSpeed: number;
+}
+
+interface OlympusOrb {
+  mesh: THREE.Mesh;
+  velocity: THREE.Vector3;
+  age: number;
+  maxAge: number;
+}
+
+interface VictoryBeam {
+  mesh: THREE.Mesh;
   age: number;
   maxAge: number;
 }
 
 /**
- * Handles trader "juice" animations:
- * - Hitstop time-dilation on 50% CE Sniper Fills
- * - Spring camera trauma / shake on News Spikes & Stop-Outs
- * - Expanding 3D shockwave rings & glass-shatter particle bursts
+ * God of War II Winning Juice & Combat Animation Controller:
+ * - Sweeping fiery Blades of Chaos crescent slashes across mitigated FVGs
+ * - Fountains of glowing Red & Gold Olympus Orbs spiraling skyward
+ * - Vertical Golden Pillar of Light on Sniper 50% CE wins
+ * - 0.25s Hitstop slow-motion + camera zoom-punch & earthquake trauma
  */
 export class AnimationController {
   private scene: THREE.Scene;
   private shockwaves: Shockwave[] = [];
-  private bursts: ParticleBurst[] = [];
+  private slashes: BladeSlash[] = [];
+  private orbs: OlympusOrb[] = [];
+  private beams: VictoryBeam[] = [];
 
   private hitstopTimer = 0;
   private cameraShake = 0;
@@ -32,19 +48,19 @@ export class AnimationController {
     this.scene = scene;
   }
 
-  public triggerHitstop(durationSec = 0.24): void {
+  public triggerHitstop(durationSec = 0.25): void {
     this.hitstopTimer = Math.max(this.hitstopTimer, durationSec);
-    this.zoomPunch = 1.6;
+    this.zoomPunch = 2.1;
   }
 
-  public triggerCameraShake(intensity = 0.55): void {
-    this.cameraShake = Math.min(1.4, this.cameraShake + intensity);
+  public triggerCameraShake(intensity = 0.6): void {
+    this.cameraShake = Math.min(1.5, this.cameraShake + intensity);
   }
 
   public getTimeScale(rawDt: number): number {
     if (this.hitstopTimer > 0) {
       this.hitstopTimer = Math.max(0, this.hitstopTimer - rawDt);
-      return 0.2;
+      return 0.18;
     }
     return 1.0;
   }
@@ -54,10 +70,10 @@ export class AnimationController {
     shakeY: number;
     zoomOffset: number;
   } {
-    this.cameraShake = Math.max(0, this.cameraShake - dt * 2.6);
-    this.zoomPunch = Math.max(0, this.zoomPunch - dt * 5.5);
+    this.cameraShake = Math.max(0, this.cameraShake - dt * 2.5);
+    this.zoomPunch = Math.max(0, this.zoomPunch - dt * 5.0);
 
-    const mag = this.cameraShake * this.cameraShake * 0.45;
+    const mag = this.cameraShake * this.cameraShake * 0.48;
     return {
       shakeX: (Math.random() - 0.5) * mag,
       shakeY: (Math.random() - 0.5) * mag,
@@ -66,7 +82,7 @@ export class AnimationController {
   }
 
   public spawnShockwave(position: THREE.Vector3, colorHex: number): void {
-    const geom = new THREE.RingGeometry(0.25, 0.45, 36);
+    const geom = new THREE.RingGeometry(0.3, 0.55, 36);
     const mat = new THREE.MeshBasicMaterial({
       color: colorHex,
       side: THREE.DoubleSide,
@@ -80,53 +96,100 @@ export class AnimationController {
     this.shockwaves.push({
       mesh,
       age: 0,
-      maxAge: 0.65,
+      maxAge: 0.7,
     });
   }
 
-  public spawnParticles(
+  /**
+   * Sweeping fiery Blades of Chaos crescent slash animation
+   */
+  public spawnBladeSlash(position: THREE.Vector3, isDoubleCross = false): void {
+    const angles = isDoubleCross ? [-0.65, 0.65] : [-0.45];
+
+    for (const tilt of angles) {
+      const geom = new THREE.RingGeometry(1.4, 2.05, 32, 1, -Math.PI * 0.35, Math.PI * 0.7);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xff6b00,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 1,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.copy(position);
+      mesh.position.z += 0.6;
+      mesh.rotation.z = tilt;
+      this.scene.add(mesh);
+
+      this.slashes.push({
+        mesh,
+        age: 0,
+        maxAge: 0.45,
+        spinSpeed: tilt >= 0 ? 7.5 : -7.5,
+      });
+    }
+  }
+
+  /**
+   * Classic God of War Red & Gold Orbs erupting from a winning trade
+   */
+  public spawnOlympusOrbs(
     position: THREE.Vector3,
-    colorHex: number,
-    count = 28
+    count = 26,
+    isLoss = false
   ): void {
-    const positions = new Float32Array(count * 3);
-    const velocities = new Float32Array(count * 3);
+    const orbGeom = new THREE.SphereGeometry(0.16, 10, 10);
 
     for (let i = 0; i < count; i++) {
-      positions[i * 3] = position.x;
-      positions[i * 3 + 1] = position.y;
-      positions[i * 3 + 2] = position.z;
+      const isGold = !isLoss && i % 3 !== 0;
+      const color = isLoss ? 0xdc2626 : isGold ? 0xffd166 : 0xff3b30;
+
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 1,
+      });
+      const mesh = new THREE.Mesh(orbGeom, mat);
+      mesh.position.copy(position);
 
       const angle = Math.random() * Math.PI * 2;
-      const speed = 1.8 + Math.random() * 4.5;
-      velocities[i * 3] = Math.cos(angle) * speed;
-      velocities[i * 3 + 1] = Math.sin(angle) * speed + 1.2;
-      velocities[i * 3 + 2] = (Math.random() - 0.5) * 3.5;
+      const speed = 2.0 + Math.random() * 4.5;
+      const velocity = new THREE.Vector3(
+        Math.cos(angle) * speed,
+        isLoss ? 1.5 + Math.random() * 2 : 3.2 + Math.random() * 4.5,
+        (Math.random() - 0.5) * 3.0
+      );
+
+      this.scene.add(mesh);
+      this.orbs.push({
+        mesh,
+        velocity,
+        age: 0,
+        maxAge: 1.05,
+      });
     }
+  }
 
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-    const mat = new THREE.PointsMaterial({
-      color: colorHex,
-      size: 0.22,
+  public spawnVictoryBeam(position: THREE.Vector3): void {
+    const geom = new THREE.CylinderGeometry(0.45, 0.9, 26, 16, 1, true);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffd166,
       transparent: true,
-      opacity: 1,
+      opacity: 0.55,
+      side: THREE.DoubleSide,
     });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.set(position.x, position.y + 4, position.z - 0.3);
+    this.scene.add(mesh);
 
-    const points = new THREE.Points(geom, mat);
-    this.scene.add(points);
-
-    this.bursts.push({
-      points,
-      velocities,
+    this.beams.push({
+      mesh,
       age: 0,
       maxAge: 0.75,
     });
   }
 
   public update(dt: number): void {
-    // Update expanding shockwaves
+    // Shockwaves
     for (let i = this.shockwaves.length - 1; i >= 0; i--) {
       const sw = this.shockwaves[i];
       sw.age += dt;
@@ -137,36 +200,65 @@ export class AnimationController {
         (sw.mesh.material as THREE.Material).dispose();
         this.shockwaves.splice(i, 1);
       } else {
-        const scale = 1 + t * 7.5;
+        const scale = 1 + t * 8.0;
         sw.mesh.scale.set(scale, scale, 1);
         (sw.mesh.material as THREE.MeshBasicMaterial).opacity = 1 - t;
       }
     }
 
-    // Update particle bursts
-    for (let i = this.bursts.length - 1; i >= 0; i--) {
-      const b = this.bursts[i];
+    // Blades of Chaos slashes
+    for (let i = this.slashes.length - 1; i >= 0; i--) {
+      const sl = this.slashes[i];
+      sl.age += dt;
+      const t = sl.age / sl.maxAge;
+      if (t >= 1) {
+        this.scene.remove(sl.mesh);
+        sl.mesh.geometry.dispose();
+        (sl.mesh.material as THREE.Material).dispose();
+        this.slashes.splice(i, 1);
+      } else {
+        sl.mesh.rotation.z += sl.spinSpeed * dt;
+        const scale = 0.8 + t * 1.4;
+        sl.mesh.scale.set(scale, scale, 1);
+        (sl.mesh.material as THREE.MeshBasicMaterial).opacity = 1 - t;
+      }
+    }
+
+    // Olympus Orbs
+    for (let i = this.orbs.length - 1; i >= 0; i--) {
+      const orb = this.orbs[i];
+      orb.age += dt;
+      const t = orb.age / orb.maxAge;
+      if (t >= 1) {
+        this.scene.remove(orb.mesh);
+        (orb.mesh.material as THREE.Material).dispose();
+        this.orbs.splice(i, 1);
+      } else {
+        orb.mesh.position.addScaledVector(orb.velocity, dt);
+        // After initial fountain burst, pull orbs upward toward the Dollar Balance HUD
+        if (t > 0.35) {
+          orb.velocity.y += 14.0 * dt;
+          orb.velocity.x += 4.5 * dt;
+        } else {
+          orb.velocity.y -= 4.0 * dt;
+        }
+        (orb.mesh.material as THREE.MeshBasicMaterial).opacity = 1 - t * 0.85;
+      }
+    }
+
+    // Victory Beams
+    for (let i = this.beams.length - 1; i >= 0; i--) {
+      const b = this.beams[i];
       b.age += dt;
       const t = b.age / b.maxAge;
       if (t >= 1) {
-        this.scene.remove(b.points);
-        b.points.geometry.dispose();
-        (b.points.material as THREE.Material).dispose();
-        this.bursts.splice(i, 1);
+        this.scene.remove(b.mesh);
+        b.mesh.geometry.dispose();
+        (b.mesh.material as THREE.Material).dispose();
+        this.beams.splice(i, 1);
       } else {
-        const attr = b.points.geometry.getAttribute(
-          'position'
-        ) as THREE.BufferAttribute;
-        const arr = attr.array as Float32Array;
-        const count = arr.length / 3;
-        for (let j = 0; j < count; j++) {
-          arr[j * 3] += b.velocities[j * 3] * dt;
-          arr[j * 3 + 1] += b.velocities[j * 3 + 1] * dt;
-          arr[j * 3 + 2] += b.velocities[j * 3 + 2] * dt;
-          b.velocities[j * 3 + 1] -= 7.5 * dt; // gravity
-        }
-        attr.needsUpdate = true;
-        (b.points.material as THREE.PointsMaterial).opacity = 1 - t;
+        b.mesh.scale.set(1 - t * 0.5, 1, 1 - t * 0.5);
+        (b.mesh.material as THREE.MeshBasicMaterial).opacity = 0.55 * (1 - t);
       }
     }
   }

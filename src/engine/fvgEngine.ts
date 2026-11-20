@@ -6,91 +6,102 @@ import {
   TradeOutcome,
 } from '../types/market';
 
+export const STARTING_DOLLARS = 10000;
+
+/**
+ * 5 God of War II Mythic Realms — each realm shifts the 3D arena lighting,
+ * marble pillar tint, brazier fire color, candle speed, and market volatility.
+ */
 export const LEVEL_CONFIGS: LevelConfig[] = [
   {
     level: 1,
-    name: '4H Swing',
-    sessionLabel: 'LVL 1 · 4H SWING',
-    themeAccent: '#00f5a0',
-    fogColor: 0x060913,
-    gridColor: 0x162447,
-    candleIntervalMs: 1150,
+    name: 'Colossus of Rhodes',
+    sessionLabel: 'REALM I · COLOSSUS OF RHODES',
+    themeAccent: '#fbbf24',
+    fogColor: 0x160e07,
+    gridColor: 0x5c3a18,
+    pillarColor: 0xb89668,
+    brazierColor: 0xff8c1a,
+    candleIntervalMs: 1120,
     volatility: 1.0,
     sweepProbability: 0.15,
-    orderBlockProbability: 0.2,
+    orderBlockProbability: 0.25,
     newsSpikeProbability: 0.0,
-    targetScore: 600,
-    description: 'Clean institutional displacement & hydraulic retracements.',
+    targetBalance: 13500,
+    description: 'Sunlit bronze pillars & clean institutional 4H swing FVGs.',
   },
   {
     level: 2,
-    name: 'London Open',
-    sessionLabel: 'LVL 2 · LONDON OPEN',
+    name: 'Steeds of Time',
+    sessionLabel: 'REALM II · STEEDS OF TIME',
     themeAccent: '#38bdf8',
-    fogColor: 0x050d1a,
-    gridColor: 0x163859,
-    candleIntervalMs: 980,
+    fogColor: 0x071322,
+    gridColor: 0x1a476e,
+    pillarColor: 0x7b96b0,
+    brazierColor: 0x38bdf8,
+    candleIntervalMs: 960,
     volatility: 1.25,
     sweepProbability: 0.45,
-    orderBlockProbability: 0.3,
+    orderBlockProbability: 0.35,
     newsSpikeProbability: 0.08,
-    targetScore: 1500,
-    description: 'Equal highs & lows get swept right before displacement.',
+    targetBalance: 18500,
+    description: 'Aegean storm mist — equal highs/lows swept before displacement.',
   },
   {
     level: 3,
-    name: 'NY Overlap',
-    sessionLabel: 'LVL 3 · NY OVERLAP',
-    themeAccent: '#fbbf24',
-    fogColor: 0x0d0a16,
-    gridColor: 0x3b2a54,
-    candleIntervalMs: 840,
+    name: 'Island of Creation',
+    sessionLabel: 'REALM III · ISLAND OF CREATION',
+    themeAccent: '#f97316',
+    fogColor: 0x1c0b06,
+    gridColor: 0x6b2814,
+    pillarColor: 0x8c6249,
+    brazierColor: 0xff5500,
+    candleIntervalMs: 820,
     volatility: 1.45,
     sweepProbability: 0.5,
     orderBlockProbability: 0.55,
     newsSpikeProbability: 0.15,
-    targetScore: 2800,
-    description: 'Order Block + FVG confluence zones multiply payouts.',
+    targetBalance: 26000,
+    description: 'Molten temple gold — Order Block + FVG confluence pays 1.5x.',
   },
   {
     level: 4,
-    name: 'FOMC / CPI News',
-    sessionLabel: 'LVL 4 · FOMC / CPI NEWS',
+    name: 'Abyss of Hades',
+    sessionLabel: 'REALM IV · ABYSS OF HADES',
     themeAccent: '#f43f5e',
-    fogColor: 0x14070e,
-    gridColor: 0x4c1729,
-    candleIntervalMs: 720,
+    fogColor: 0x1d0509,
+    gridColor: 0x691422,
+    pillarColor: 0x593a3e,
+    brazierColor: 0xff1e38,
+    candleIntervalMs: 700,
     volatility: 1.75,
     sweepProbability: 0.6,
     orderBlockProbability: 0.5,
     newsSpikeProbability: 0.35,
-    targetScore: 4500,
-    description: 'High-impact news spikes & violent Inverse FVG flips.',
+    targetBalance: 38000,
+    description: 'Underworld hellfire — violent news spikes & rapid IFVG flips.',
   },
   {
     level: 5,
-    name: '5s Scalper Overdrive',
-    sessionLabel: 'LVL 5 · 5S SCALPER OVERDRIVE',
+    name: 'Throne of Olympus',
+    sessionLabel: 'REALM V · THRONE OF OLYMPUS',
     themeAccent: '#c084fc',
-    fogColor: 0x090517,
-    gridColor: 0x351b63,
-    candleIntervalMs: 600,
+    fogColor: 0x110724,
+    gridColor: 0x4b2285,
+    pillarColor: 0xd8c39e,
+    brazierColor: 0xd946ef,
+    candleIntervalMs: 590,
     volatility: 2.0,
     sweepProbability: 0.65,
-    orderBlockProbability: 0.6,
+    orderBlockProbability: 0.65,
     newsSpikeProbability: 0.4,
-    targetScore: 999999,
-    description: 'Maximum tick velocity. Chain sniper fills to raise synth pitch.',
+    targetBalance: 9999999,
+    description: 'Divine overdrive — chain 50% CE strikes for massive dollar payouts.',
   },
 ];
 
 const MIN_GAP_HEIGHT = 0.65;
 
-/**
- * Detects an ICT / Smart Money Concepts 3-candle Fair Value Gap (FVG):
- * - Bullish FVG (BISI): Candle 3 low > Candle 1 high after a bullish displacement Candle 2.
- * - Bearish FVG (SIBI): Candle 3 high < Candle 1 low after a bearish displacement Candle 2.
- */
 export function detectFairValueGap(
   c1: Candle,
   c2: Candle,
@@ -99,12 +110,11 @@ export function detectFairValueGap(
   const c2Body = Math.abs(c2.close - c2.open);
   if (c2Body < 1.1) return null;
 
-  // Bullish Fair Value Gap (Buy-Side Imbalance, Sell-Side Inefficiency)
+  // Bullish FVG (BISI)
   if (c2.close > c2.open && c3.low > c1.high) {
     const bottom = c1.high;
     const top = c3.low;
-    const height = top - bottom;
-    if (height < MIN_GAP_HEIGHT) return null;
+    if (top - bottom < MIN_GAP_HEIGHT) return null;
 
     return {
       id: `fvg-bull-${c3.index}-${Math.round(performance.now())}`,
@@ -123,12 +133,11 @@ export function detectFairValueGap(
     };
   }
 
-  // Bearish Fair Value Gap (Sell-Side Imbalance, Buy-Side Inefficiency)
+  // Bearish FVG (SIBI)
   if (c2.close < c2.open && c3.high < c1.low) {
     const top = c1.low;
     const bottom = c3.high;
-    const height = top - bottom;
-    if (height < MIN_GAP_HEIGHT) return null;
+    if (top - bottom < MIN_GAP_HEIGHT) return null;
 
     return {
       id: `fvg-bear-${c3.index}-${Math.round(performance.now())}`,
@@ -150,10 +159,6 @@ export function detectFairValueGap(
   return null;
 }
 
-/**
- * Evaluates player limit-order placement inside an FVG relative to
- * Consequent Encroachment (50% equilibrium midpoint).
- */
 export function evaluateEntryPrecision(
   gap: FairValueGap,
   rawEntryPrice: number
@@ -171,7 +176,7 @@ export function evaluateEntryPrecision(
   let fillQuality: FillQuality = 'EDGE';
   let rrMultiplier = 1.4;
 
-  if (normalizedDistanceFromCE <= 0.24) {
+  if (normalizedDistanceFromCE <= 0.25) {
     fillQuality = 'SNIPER_CE';
     rrMultiplier = 3.0;
   } else if (normalizedDistanceFromCE <= 0.62) {
@@ -193,10 +198,6 @@ export function evaluateEntryPrecision(
   };
 }
 
-/**
- * Evaluates every newly closed candle against open / armed Fair Value Gaps
- * to detect clean mitigations (bounces) or invalidations (IFVG polarity flips).
- */
 export function evaluateCandleAgainstGaps(
   candle: Candle,
   gaps: FairValueGap[],
@@ -216,7 +217,6 @@ export function evaluateCandleAgainstGaps(
 
     const isBullish = gap.direction === 'BULLISH';
 
-    // 1. Check Invalidation (price slices completely past distal edge)
     const invalidated = isBullish
       ? candle.close < gap.bottom ||
         (gap.stopLossPrice !== null && candle.low < gap.stopLossPrice)
@@ -233,18 +233,19 @@ export function evaluateCandleAgainstGaps(
         outcomes.push({
           fvgId: gap.id,
           won: false,
-          pointsDelta: -100,
+          dollarDelta: -500,
           fillQuality: gap.fillQuality,
           rrMultiplier: gap.rrMultiplier,
           streak,
-          headline: 'STOPPED OUT · IFVG FLIP!',
-          subtext: 'Disrespect of FVG inverted zone polarity',
+          headline: 'STOPPED OUT · -$500',
+          subtext: 'Gap violated & flipped into an Inverse FVG',
+          worldX: candle.index * 1.15,
+          worldY: (gap.ceMidpoint - 100) * 0.85,
         });
       }
       continue;
     }
 
-    // 2. Check Mitigation / Bounce if player armed a limit order inside the gap
     if (gap.status === 'ORDER_PLACED' && gap.orderEntryPrice !== null) {
       const touchedEntry = isBullish
         ? candle.low <= gap.orderEntryPrice
@@ -261,45 +262,49 @@ export function evaluateCandleAgainstGaps(
 
         const obBonus = gap.hasOrderBlockConfluence ? 1.5 : 1.0;
         const streakBonus = 1 + (streak - 1) * 0.25;
-        const points = Math.round(
-          100 * gap.rrMultiplier * streakBonus * obBonus
+        const baseDollarRisk = 500;
+        const dollarWin = Math.round(
+          baseDollarRisk * gap.rrMultiplier * streakBonus * obBonus
         );
 
         const headline =
           gap.fillQuality === 'SNIPER_CE'
-            ? `SNIPER 50% CE FILL! +${points}`
+            ? `⚔️ 50% CE SNIPER STRIKE! +$${dollarWin.toLocaleString()}`
             : gap.fillQuality === 'PRECISION'
-            ? `PRECISION MITIGATION! +${points}`
-            : `FVG BOUNCE! +${points}`;
+            ? `PRECISION BOUNCE! +$${dollarWin.toLocaleString()}`
+            : `FVG MITIGATED! +$${dollarWin.toLocaleString()}`;
 
-        const subtext = `${gap.rrMultiplier.toFixed(1)}x R:R · ${streak}x Streak${
+        const subtext = `${gap.rrMultiplier.toFixed(1)}x R:R · ${streak}x Rage Streak${
           gap.hasOrderBlockConfluence ? ' · OB Confluence (1.5x)' : ''
         }`;
 
         outcomes.push({
           fvgId: gap.id,
           won: true,
-          pointsDelta: points,
+          dollarDelta: dollarWin,
           fillQuality: gap.fillQuality,
           rrMultiplier: gap.rrMultiplier,
           streak,
           headline,
           subtext,
+          worldX: candle.index * 1.15,
+          worldY: (gap.ceMidpoint - 100) * 0.85,
         });
       } else if (touchedEntry && !rejectedAway) {
-        // Wicked through entry and closed deep in gap without bouncing cleanly
         gap.status = 'INVALIDATED_IFVG';
         gap.mitigatedAtIndex = candle.index;
         streak = 0;
         outcomes.push({
           fvgId: gap.id,
           won: false,
-          pointsDelta: -75,
+          dollarDelta: -500,
           fillQuality: gap.fillQuality,
           rrMultiplier: gap.rrMultiplier,
           streak,
-          headline: 'WICKED OUT · NO REJECTION',
-          subtext: 'Price failed to displace away from FVG',
+          headline: 'WICKED OUT · -$500',
+          subtext: 'Price failed to reject away from FVG',
+          worldX: candle.index * 1.15,
+          worldY: (gap.ceMidpoint - 100) * 0.85,
         });
       }
     }

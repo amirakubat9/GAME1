@@ -44,22 +44,35 @@ export interface LevelConfig {
   themeAccent: string;
   fogColor: number;
   gridColor: number;
+  pillarColor: number;
+  brazierColor: number;
   candleIntervalMs: number;
   volatility: number;
   sweepProbability: number;
   orderBlockProbability: number;
   newsSpikeProbability: number;
-  targetScore: number;
+  targetBalance: number;
   description: string;
 }
 
 export interface TradeOutcome {
   fvgId: string;
   won: boolean;
-  pointsDelta: number;
+  dollarDelta: number;
   fillQuality: FillQuality | null;
   rrMultiplier: number;
   streak: number;
   headline: string;
   subtext: string;
+  worldX: number;
+  worldY: number;
+}
+
+export interface LeaderboardEntry {
+  id?: string;
+  player_name: string;
+  peak_dollars: number;
+  best_streak: number;
+  realm_reached: string;
+  created_at?: string;
 }
